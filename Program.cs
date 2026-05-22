@@ -17,6 +17,28 @@ var jwtSecret = builder.Configuration["Jwt:SecretKey"]
     ?? throw new InvalidOperationException(
         "Jwt:SecretKey is not configured. Set via env var Jwt__SecretKey.");
 
+// CORS: haal allowed origins op uit configuratie (komma-gescheiden)
+var allowedOrigins = (builder.Configuration["Cors:AllowedOrigins"] ?? "http://localhost:3001")
+    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy.WithOrigins(allowedOrigins)
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
+    options.AddPolicy("FrontendPolicy", policy =>
+    {
+        policy.WithOrigins(allowedOrigins)
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
+});
+
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(connectionString));
 
@@ -40,7 +62,8 @@ builder.Services
             ValidateIssuerSigningKey = true,
             ValidIssuer = builder.Configuration["Jwt:Issuer"],
             ValidAudience = builder.Configuration["Jwt:Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret))
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
+            ClockSkew = TimeSpan.Zero
         };
     });
 
@@ -65,6 +88,16 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+else
+{
+    // HSTS + HTTPS-redirect alleen in productie (TLS 1.3 via reverse proxy)
+    app.UseHsts();
+    app.UseHttpsRedirection();
+}
+
+// UseCors zonder argument gebruikt de default policy en onderschept ook
+// OPTIONS-preflight-verzoeken vóór de controller-routing ze verwerpt.
+app.UseCors();
 
 app.UseAuthentication();
 app.UseAuthorization();
