@@ -27,6 +27,9 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
       ConnectionStrings__DefaultConnection: "Host=db;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
+      Jwt__SecretKey: ${JWT_SECRET}
+      Jwt__Issuer: OpenMRSmoduleBackend
+      Jwt__Audience: OpenMRSmoduleBackend
     ports:
       - "${API_PORT:-8080}:8080"
 
