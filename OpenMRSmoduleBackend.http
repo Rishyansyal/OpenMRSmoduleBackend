@@ -1,0 +1,6 @@
+@OpenMRSmoduleBackend_HostAddress = http://localhost:5111
+
+GET {{OpenMRSmoduleBackend_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
