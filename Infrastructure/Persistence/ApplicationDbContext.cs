@@ -15,7 +15,8 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         {
             e.ToTable("users");
             e.HasKey(u => u.Id);
-            e.Property(u => u.Email).IsRequired();
+            e.Property(u => u.Id).HasColumnName("id");
+            e.Property(u => u.Email).HasColumnName("email").IsRequired();
             e.HasIndex(u => u.Email).IsUnique();
             e.Property(u => u.PasswordHash).HasColumnName("password_hash").IsRequired();
             e.Property(u => u.CreatedAt).HasColumnName("created_at");
