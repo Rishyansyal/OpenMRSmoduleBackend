@@ -4,7 +4,19 @@ ASP.NET Core 10 backend voor het versturen van berichten en afspraakherinneringe
 
 ---
 
-## Opstarten
+## Snel opstarten (alle diensten tegelijk)
+
+Vanuit de bovenliggende map (`2.4/`):
+
+```bash
+./start.sh
+# Daarna de frontend apart:
+cd openmrsmodulefrontend && npm run dev
+```
+
+---
+
+## Opstarten (stap voor stap)
 
 ### 1. Vereisten
 
