@@ -1,11 +1,13 @@
 using System.Text;
 using Application.Auth;
 using Application.OpenMrs;
+using Application.Reminders;
 using Application.Messaging;
 using Infrastructure.Auth;
 using Infrastructure.Messaging;
 using Infrastructure.Messaging.Options;
 using Infrastructure.OpenMrs;
+using Infrastructure.Reminders;
 using Infrastructure.Messaging.Providers;
 using Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -80,6 +82,12 @@ builder.Services.AddScoped<IMessageLogRepository, MessageLogRepository>();
 // OpenMRS FHIR integratie
 builder.Services.Configure<OpenMrsOptions>(builder.Configuration.GetSection("OpenMrs"));
 builder.Services.AddScoped<IOpenMrsService, OpenMrsService>();
+
+// Afspraakherinneringen
+builder.Services.Configure<ReminderOptions>(builder.Configuration.GetSection("Reminders"));
+builder.Services.AddScoped<IReminderLogRepository, ReminderLogRepository>();
+builder.Services.AddSingleton<ReminderWorker>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<ReminderWorker>());
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
