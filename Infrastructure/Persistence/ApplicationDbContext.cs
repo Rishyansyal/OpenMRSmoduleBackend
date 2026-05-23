@@ -48,6 +48,10 @@ public class ApplicationDbContext(
             e.Property(r => r.ErrorCode).HasColumnName("error_code");
             e.Property(r => r.EncounterStart).HasColumnName("encounter_start");
             e.Property(r => r.SentAt).HasColumnName("sent_at");
+            e.Property(r => r.PatientName).HasColumnName("patient_name").HasConversion(
+                new ValueConverter<string?, string?>(
+                    v => v == null ? null : encryption.Encrypt(v),
+                    v => v == null ? null : encryption.Decrypt(v)));
             e.HasIndex(r => new { r.EncounterIdHash, r.ReminderWindow });
         });
 

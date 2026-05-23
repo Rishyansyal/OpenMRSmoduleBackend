@@ -66,7 +66,8 @@ public class SendReminderConsumer(
             Provider = cmd.Provider,
             Success = result.Success,
             ErrorCode = result.Success ? null : "SEND_ERROR",
-            EncounterStart = cmd.EncounterStart
+            EncounterStart = cmd.EncounterStart,
+            PatientName = patient.DisplayName
         }, ct);
 
         if (result.Success)

@@ -11,4 +11,5 @@ public class ReminderLog
     public string? ErrorCode { get; init; }
     public DateTime EncounterStart { get; init; }
     public DateTime SentAt { get; init; } = DateTime.UtcNow;
+    public string? PatientName { get; set; }
 }
