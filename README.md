@@ -1,0 +1,116 @@
+# OpenMRS Communicatiemodule — Backend
+
+ASP.NET Core 10 backend voor het versturen van berichten en afspraakherinneringen via externe messaging providers.
+
+---
+
+## Snel opstarten (alle diensten tegelijk)
+
+Vanuit de bovenliggende map (`2.4/`):
+
+```bash
+./start.sh
+# Daarna de frontend apart:
+cd openmrsmodulefrontend && npm run dev
+```
+
+---
+
+## Opstarten (stap voor stap)
+
+### 1. Vereisten
+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (draait PostgreSQL + de API zelf)
+- OpenMRS draaiend op poort `3032` (zie `openmrs-distro-referenceapplication`)
+- FakeComWorld providers draaiend op poort `1337`
+
+### 2. FakeComWorld starten
+
+```bash
+# Eerste keer
+docker run -d --name fakecomworld -p 1337:8080 ghcr.io/avansict/in2.4-fakecomworld:main
+
+# Daarna
+docker start fakecomworld
+```
+
+### 3. OpenMRS starten
+
+```bash
+cd ../openmrs-distro-referenceapplication
+docker compose up -d
+```
+
+> OpenMRS is beschikbaar op `http://localhost:3032` — het opstarten duurt ~2 minuten.
+
+### 4. Omgevingsvariabelen instellen
+
+```bash
+cp .env.example .env
+```
+
+Open `.env` en vul de waarden in. De FakeComWorld API keys zijn te vinden op `http://localhost:1337`.
+
+### 5. Backend starten
+
+```bash
+docker compose up -d --build
+```
+
+| Dienst | URL |
+|---|---|
+| REST API | http://localhost:5111 |
+| Swagger UI | http://localhost:5111/swagger |
+| Prometheus metrics | http://localhost:5111/metrics |
+
+### 6. Verificatie
+
+```bash
+curl http://localhost:5111/health
+```
+
+Verwacht: `{"status":"Healthy"}`
+
+---
+
+## Voorbeeld: eerste aanvraag
+
+```bash
+# 1. Registreer een gebruiker
+curl -X POST http://localhost:5111/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@example.com","password":"Admin123!"}'
+
+# 2. Login en kopieer het token
+curl -X POST http://localhost:5111/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@example.com","password":"Admin123!"}'
+
+# 3. Stuur een testbericht (vervang <TOKEN> door het JWT uit stap 2)
+curl -X POST http://localhost:5111/api/messages \
+  -H "Authorization: Bearer <TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "provider": "swiftsend",
+    "messageType": "sms",
+    "recipients": ["+31612345678"],
+    "content": "Testbericht vanuit de communicatiemodule."
+  }'
+```
+
+---
+
+## Alles stoppen
+
+```bash
+docker compose down
+docker stop fakecomworld
+```
+
+---
+
+## Meer informatie
+
+- [Architectuurdocumentatie (C4)](docs/c4/README.md)
+- [ADR-logboek](docs/adr/)
+- [Agent-instructies](AGENTS.md)

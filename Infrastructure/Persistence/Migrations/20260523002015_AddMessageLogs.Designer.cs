@@ -3,6 +3,7 @@ using System;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace OpenMRSmoduleBackend.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260523002015_AddMessageLogs")]
+    partial class AddMessageLogs
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -73,51 +76,6 @@ namespace OpenMRSmoduleBackend.Infrastructure.Persistence.Migrations
                     b.HasIndex("SentAt");
 
                     b.ToTable("message_logs", (string)null);
-                });
-
-            modelBuilder.Entity("Domain.ReminderLog", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("EncounterId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("encounter_id");
-
-                    b.Property<DateTime>("EncounterStart")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("encounter_start");
-
-                    b.Property<string>("ErrorCode")
-                        .HasColumnType("text")
-                        .HasColumnName("error_code");
-
-                    b.Property<string>("Provider")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("provider");
-
-                    b.Property<string>("ReminderWindow")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("reminder_window");
-
-                    b.Property<DateTime>("SentAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("sent_at");
-
-                    b.Property<bool>("Success")
-                        .HasColumnType("boolean")
-                        .HasColumnName("success");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("EncounterId", "ReminderWindow");
-
-                    b.ToTable("reminder_logs", (string)null);
                 });
 
             modelBuilder.Entity("Domain.User", b =>

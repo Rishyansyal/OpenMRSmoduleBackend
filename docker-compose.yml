@@ -27,6 +27,27 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
       ConnectionStrings__DefaultConnection: "Host=db;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
+      Jwt__SecretKey: ${JWT_SECRET}
+      Jwt__Issuer: OpenMRSmoduleBackend
+      Jwt__Audience: OpenMRSmoduleBackend
+      Cors__AllowedOrigins: ${ALLOWED_ORIGINS:-http://localhost:3001}
+      OpenMrs__BaseUrl: ${OPENMRS_BASE_URL:-http://host.docker.internal:3032}
+      OpenMrs__Username: ${OPENMRS_USERNAME}
+      OpenMrs__Password: ${OPENMRS_PASSWORD}
+      Messaging__StudentGroup: ${MESSAGING_STUDENT_GROUP}
+      Messaging__SwiftSend__BaseUrl: ${MESSAGING_PROVIDERS_BASE_URL:-http://host.docker.internal:1337}
+      Messaging__SwiftSend__ApiKey: ${MESSAGING_SWIFTSEND_APIKEY}
+      Messaging__SecurePost__BaseUrl: ${MESSAGING_PROVIDERS_BASE_URL:-http://host.docker.internal:1337}
+      Messaging__SecurePost__ClientId: ${MESSAGING_SECUREPOST_CLIENT_ID}
+      Messaging__SecurePost__ClientSecret: ${MESSAGING_SECUREPOST_CLIENT_SECRET}
+      Messaging__LegacyLink__BaseUrl: ${MESSAGING_PROVIDERS_BASE_URL:-http://host.docker.internal:1337}
+      Messaging__LegacyLink__Username: ${MESSAGING_LEGACYLINK_USERNAME}
+      Messaging__LegacyLink__Password: ${MESSAGING_LEGACYLINK_PASSWORD}
+      Messaging__AsyncFlow__BaseUrl: ${MESSAGING_PROVIDERS_BASE_URL:-http://host.docker.internal:1337}
+      Messaging__AsyncFlow__ApiKey: ${MESSAGING_ASYNCFLOW_APIKEY}
+      RabbitMq__Host: ${RABBITMQ_HOST:-}
+      RabbitMq__Username: ${RABBITMQ_USERNAME:-guest}
+      RabbitMq__Password: ${RABBITMQ_PASSWORD:-guest}
     ports:
       - "${API_PORT:-8080}:8080"
 
