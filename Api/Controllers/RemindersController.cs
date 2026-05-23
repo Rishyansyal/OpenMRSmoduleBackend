@@ -43,13 +43,19 @@ public class RemindersController(
         if (patient is null)
             return NotFound(new { message = "Patiënt niet gevonden in OpenMRS." });
 
-        var recipient = patient.Phone ?? patient.Email ?? "demo@example.com";
+        var recipient = patient.Phone ?? patient.Email;
+        var type = patient.Phone is not null ? "SMS" : "EMAIL";
+        if (recipient is null)
+        {
+            recipient = "+31600000000";
+            type = "SMS";
+        }
         var provider = reminderOptions.Value.DefaultProvider;
         var content = $"Demo: u heeft een afspraak op {encounter.Start:dddd d MMMM 'om' HH:mm}.";
 
         var result = await messagingService.SendAsync(
             provider,
-            new SendMessageRequest([recipient], content, patient.Phone is not null ? "SMS" : "EMAIL"),
+            new SendMessageRequest([recipient], content, type),
             ct);
 
         await reminderLogRepository.LogAsync(new ReminderLog
