@@ -5,7 +5,7 @@ Laatste update: 2026-05-23
 | Laag | Testset | Status |
 |---|---|---|
 | Backend unit | HMAC, encryptie, webhook scheduling | Lokaal geslaagd: 8 tests |
-| Backend integration | EF/DB migratie via CI Postgres service | Workflow toegevoegd; migratie lokaal ontdekt met `dotnet ef migrations list --no-build` |
+| Backend integration | `WebApplicationFactory`, SQLite temp DB, health/db, auth, signed webhook, idempotency, reminders API | Lokaal geslaagd: 4 tests |
 | Frontend unit | Vitest + Testing Library | Lokaal geslaagd: 4 tests |
 | Frontend e2e | Playwright smoke | Lokaal geslaagd: 1 Chromium smoke test |
 | OpenMRS module | Maven/JUnit | Tests toegevoegd; lokaal geblokkeerd door ontbrekende Maven-installatie |
@@ -19,7 +19,7 @@ Docker Desktop draait niet en Maven is niet geinstalleerd. Docker build, Docker 
 
 - `dotnet restore .\OpenMRSmoduleBackend.Tests\OpenMRSmoduleBackend.Tests.csproj`
 - `dotnet build .\OpenMRSmoduleBackend.Tests\OpenMRSmoduleBackend.Tests.csproj --no-restore`
-- `dotnet test .\OpenMRSmoduleBackend.Tests\OpenMRSmoduleBackend.Tests.csproj --no-build`
+- `dotnet test .\OpenMRSmoduleBackend.Tests\OpenMRSmoduleBackend.Tests.csproj --no-build` (`12/12` backend tests geslaagd)
 - `dotnet tool restore`
 - `dotnet ef migrations list --no-build`
 - `npm run test`

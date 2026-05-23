@@ -114,6 +114,14 @@ Belangrijke secrets in `.env`:
 - `SECURITY_ENCRYPTION_KEY`
 - `OPENMRS_WEBHOOK_SECRET`
 
+## Tests
+
+```bash
+dotnet test OpenMRSmoduleBackend.Tests/OpenMRSmoduleBackend.Tests.csproj
+```
+
+Dit draait unit tests en automatische integratietests. De integratietests starten de echte ASP.NET Core pipeline met `WebApplicationFactory` en een tijdelijke SQLite database, zodat webhook-, auth-, health- en reminder-endpoints ook in GitHub Actions zonder lokale Docker dependency getest worden.
+
 ---
 
 ## Alles stoppen

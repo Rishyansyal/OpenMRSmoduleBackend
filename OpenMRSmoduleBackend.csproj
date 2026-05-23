@@ -8,6 +8,9 @@
 
   <ItemGroup>
     <Compile Remove="OpenMRSmoduleBackend.Tests\**\*.cs" />
+    <Content Remove="OpenMRSmoduleBackend.Tests\**\*" />
+    <EmbeddedResource Remove="OpenMRSmoduleBackend.Tests\**\*" />
+    <None Remove="OpenMRSmoduleBackend.Tests\**\*" />
   </ItemGroup>
 
   <ItemGroup>
@@ -22,6 +25,7 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.1" />
     <PackageReference Include="Npgsql" Version="10.0.2" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.1" />
     <PackageReference Include="OpenTelemetry.Api" Version="1.15.3" />
