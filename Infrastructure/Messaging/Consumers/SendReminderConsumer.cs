@@ -1,8 +1,10 @@
+using System.Diagnostics;
 using Application.Messaging;
 using Application.Messaging.Commands;
 using Application.OpenMrs;
 using Application.Reminders;
 using Domain;
+using Infrastructure.Observability;
 using MassTransit;
 using Microsoft.Extensions.Logging;
 
@@ -12,6 +14,7 @@ public class SendReminderConsumer(
     IOpenMrsService openMrsService,
     IMessagingService messagingService,
     IReminderLogRepository reminderLogRepository,
+    MessagingMetrics metrics,
     ILogger<SendReminderConsumer> logger) : IConsumer<SendReminderCommand>
 {
     public async Task Consume(ConsumeContext<SendReminderCommand> context)
@@ -46,10 +49,15 @@ public class SendReminderConsumer(
         var type = patient.Phone is not null ? "SMS" : "EMAIL";
         var content = BuildMessage(cmd);
 
+        var sw = Stopwatch.StartNew();
         var result = await messagingService.SendAsync(
             cmd.Provider,
             new SendMessageRequest([recipient], content, type),
             ct);
+        sw.Stop();
+
+        metrics.RecordReminderSent(cmd.ReminderWindow, result.Success);
+        metrics.RecordSendDuration(cmd.Provider, sw.Elapsed.TotalMilliseconds);
 
         await reminderLogRepository.LogAsync(new ReminderLog
         {

@@ -2,7 +2,11 @@ using System.Text;
 using Application.Auth;
 using Application.OpenMrs;
 using Infrastructure.Messaging.Consumers;
+using Infrastructure.Observability;
 using MassTransit;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using Application.Reminders;
 using Application.Messaging;
 using Infrastructure.Auth;
@@ -86,6 +90,22 @@ builder.Services.AddScoped<IMessageLogRepository, MessageLogRepository>();
 // OpenMRS FHIR integratie
 builder.Services.Configure<OpenMrsOptions>(builder.Configuration.GetSection("OpenMrs"));
 builder.Services.AddScoped<IOpenMrsService, OpenMrsService>();
+
+// OpenTelemetry
+builder.Services.AddSingleton<MessagingMetrics>();
+builder.Services
+    .AddOpenTelemetry()
+    .ConfigureResource(r => r.AddService("OpenMRSmoduleBackend"))
+    .WithTracing(t => t
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddEntityFrameworkCoreInstrumentation()
+        .AddSource("MassTransit"))
+    .WithMetrics(m => m
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddMeter(MessagingMetrics.MeterName)
+        .AddPrometheusExporter());
 
 // MassTransit — in-memory voor dev, RabbitMQ voor productie
 var rabbitMqHost = builder.Configuration["RabbitMq:Host"];
@@ -175,6 +195,8 @@ else
 
 // UseCors zonder argument gebruikt de default policy en onderschept ook
 // OPTIONS-preflight-verzoeken vóór de controller-routing ze verwerpt.
+app.UseOpenTelemetryPrometheusScrapingEndpoint();
+
 app.UseCors();
 
 app.UseAuthentication();
