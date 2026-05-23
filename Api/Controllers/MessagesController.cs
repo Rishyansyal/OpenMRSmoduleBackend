@@ -4,6 +4,7 @@ using Application.Messaging;
 using Domain;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Api.Controllers;
 
@@ -22,6 +23,7 @@ public class MessagesController(
         Ok(messagingService.GetAvailableProviders());
 
     [HttpPost]
+    [EnableRateLimiting("MessagePolicy")]
     public async Task<IActionResult> Send([FromBody] SendMessageApiRequest request, CancellationToken ct)
     {
         if (request.Recipients.Length > MessagingLimits.MaxRecipientCount)

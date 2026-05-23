@@ -68,22 +68,10 @@ builder.Services.AddCors(options =>
 });
 
 // ---------------------------------------------------------------------------
-// Rate limiting — beschermt auth-endpoints tegen brute-force aanvallen
-// 5 verzoeken per 60 seconden per IP-adres op /auth/*
+// Rate limiting — beschermt endpoints tegen misbruik en brute-force aanvallen
 // ---------------------------------------------------------------------------
 builder.Services.AddRateLimiter(opts =>
 {
-    opts.AddPolicy("AuthPolicy", context =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-            factory: _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit            = 5,
-                Window                 = TimeSpan.FromMinutes(1),
-                QueueProcessingOrder   = QueueProcessingOrder.OldestFirst,
-                QueueLimit             = 0   // Geen wachtrij — direct afwijzen bij overschrijding
-            }));
-
     // Standaard 429 respons
     opts.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
     opts.OnRejected = async (ctx, ct) =>
@@ -92,6 +80,42 @@ builder.Services.AddRateLimiter(opts =>
         await ctx.HttpContext.Response.WriteAsJsonAsync(
             new { error = "Too many requests. Please try again later." }, ct);
     };
+
+    // Strikte policy voor login/registratie: 5 verzoeken per minuut per IP
+    opts.AddPolicy("AuthPolicy", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit            = 5,
+                Window                 = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder   = QueueProcessingOrder.OldestFirst,
+                QueueLimit             = 0
+            }));
+
+    // Gemiddelde policy voor formulieren/messaging: 10 verzoeken per minuut per IP
+    opts.AddPolicy("MessagePolicy", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit            = 10,
+                Window                 = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder   = QueueProcessingOrder.OldestFirst,
+                QueueLimit             = 0
+            }));
+
+    // Algemene policy voor normale API calls: 100 verzoeken per minuut per IP
+    opts.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit            = 100,
+                Window                 = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder   = QueueProcessingOrder.OldestFirst,
+                QueueLimit             = 0
+            }));
 });
 
 // ---------------------------------------------------------------------------
@@ -331,8 +355,8 @@ app.UseOpenTelemetryPrometheusScrapingEndpoint();
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Auth-routes: [AllowAnonymous] voor register & login, rate limiting via policy
-app.MapControllers()
-   .RequireRateLimiting("AuthPolicy");
+// Map controllers. Algemene rate limiting (GlobalLimiter) geldt voor alles,
+// tenzij overschreven door specifieke [EnableRateLimiting] attributen.
+app.MapControllers();
 
 app.Run();
