@@ -18,6 +18,7 @@ C4Component
             Component(authCtrl, "AuthController", "ASP.NET Core", "POST /auth/login, /register, GET /auth/me")
             Component(msgCtrl, "MessagesController", "ASP.NET Core", "POST /api/messages, GET /history, /providers, /status/{id}")
             Component(openmrsCtrl, "OpenMrsController", "ASP.NET Core", "GET /api/openmrs/patients, /appointments")
+            Component(webhookCtrl, "OpenMrsWebhooksController", "ASP.NET Core", "POST /api/webhooks/openmrs/appointments")
             Component(reminderCtrl, "RemindersController", "ASP.NET Core", "POST /api/reminders/trigger, GET /history")
             Component(retentionCtrl, "DataRetentionController", "ASP.NET Core", "POST /api/data-retention/trigger")
         }
@@ -26,6 +27,7 @@ C4Component
             Component(authSvc, "IAuthService", "Interface", "Registratie en login, JWT-uitgifte")
             Component(msgSvc, "IMessagingService", "Interface", "Stuurt berichten via gekozen provider")
             Component(openMrsSvc, "IOpenMrsService", "Interface", "Patiënten en encounters via FHIR R4")
+            Component(webhookSvc, "IOpenMrsWebhookService", "Interface", "Valideert en verwerkt appointment webhook events")
             Component(msgLog, "IMessageLogRepository", "Interface", "Audit-log van verstuurde berichten")
             Component(reminderLog, "IReminderLogRepository", "Interface", "Log van verstuurde herinneringen")
             Component(retentionSvc, "IDataRetentionService", "Interface", "Verwijdert verlopen data")
@@ -37,7 +39,9 @@ C4Component
             Component(legacylink, "LegacyLinkProvider", "HttpClient", "SOAP/XML + Basic auth")
             Component(asyncflow, "AsyncFlowProvider", "HttpClient (Singleton)", "Async REST + statuspolling")
             Component(openMrsImpl, "OpenMrsService", "HttpClient", "FHIR R4 JSON parser")
-            Component(reminderWorker, "ReminderWorker", "IHostedService", "Elke 5 min: encounters ophalen → publish naar bus")
+            Component(webhookImpl, "OpenMrsWebhookService", "EF Core + AES-GCM", "Event audit, encrypted appointment state, reminderplanning")
+            Component(signature, "OpenMrsWebhookSignatureValidator", "HMAC-SHA256", "Signature, timestamp en replay checks")
+            Component(reminderWorker, "ReminderWorker", "IHostedService", "Elke 5 min: due scheduled reminders claimen → publish naar bus")
             Component(consumer, "SendReminderConsumer", "MassTransit IConsumer", "Patiënt ophalen → bericht sturen → loggen")
             Component(retentionWorker, "DataRetentionWorker", "IHostedService", "Elke 24u: verlopen records verwijderen")
             Component(metrics, "MessagingMetrics", "OpenTelemetry Meter", "Custom metrics: berichten, herinneringen, duur")
@@ -48,11 +52,14 @@ C4Component
     Rel(frontend, authCtrl, "JWT auth", "HTTPS")
     Rel(frontend, msgCtrl, "Berichten beheren", "HTTPS")
     Rel(frontend, openmrsCtrl, "Patiënten ophalen", "HTTPS")
+    Rel(openmrs, webhookCtrl, "Appointment events", "Signed webhook")
 
     Rel(authCtrl, authSvc, "Delegeert")
     Rel(msgCtrl, msgSvc, "Delegeert")
     Rel(msgCtrl, msgLog, "Logt")
     Rel(openmrsCtrl, openMrsSvc, "Delegeert")
+    Rel(webhookCtrl, signature, "Valideert headers")
+    Rel(webhookCtrl, webhookSvc, "Delegeert")
     Rel(reminderCtrl, reminderWorker, "Triggert handmatig")
     Rel(retentionCtrl, retentionSvc, "Triggert handmatig")
 
@@ -62,7 +69,10 @@ C4Component
     Rel(msgSvc, asyncflow, "Gebruikt")
     Rel(openMrsSvc, openMrsImpl, "Implementatie")
 
-    Rel(reminderWorker, openMrsSvc, "Encounters ophalen")
+    Rel(webhookSvc, webhookImpl, "Implementatie")
+    Rel(webhookImpl, efCtx, "Schrijft encrypted appointment state")
+
+    Rel(reminderWorker, efCtx, "Claimt due scheduled reminders")
     Rel(reminderWorker, bus, "Publiceert SendReminderCommand")
     Rel(bus, consumer, "Levert command")
     Rel(consumer, openMrsSvc, "Patiëntcontact ophalen")

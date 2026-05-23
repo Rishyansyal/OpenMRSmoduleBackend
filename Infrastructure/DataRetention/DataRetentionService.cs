@@ -23,13 +23,26 @@ public class DataRetentionService(
             .Where(r => r.EncounterStart < reminderCutoff)
             .ExecuteDeleteAsync(ct);
 
+        var appointmentDeleted = await db.AppointmentNotifications
+            .Where(a => a.StartUtc < reminderCutoff)
+            .ExecuteDeleteAsync(ct);
+
         // Verwijder message_logs ouder dan 1 jaar
         var messageCutoff = now.AddDays(-_options.MessageLogRetentionDays);
         var messageDeleted = await db.MessageLogs
             .Where(m => m.SentAt < messageCutoff)
             .ExecuteDeleteAsync(ct);
 
+        var webhookCutoff = now.AddDays(-_options.WebhookEventLogRetentionDays);
+        var webhookDeleted = await db.WebhookEventLogs
+            .Where(w => w.ReceivedAtUtc < webhookCutoff)
+            .ExecuteDeleteAsync(ct);
+
         metrics.RecordDataRetentionRun(reminderDeleted, messageDeleted);
-        return new DataRetentionResult(reminderDeleted, messageDeleted);
+        return new DataRetentionResult(
+            reminderDeleted,
+            messageDeleted,
+            appointmentDeleted,
+            webhookDeleted);
     }
 }

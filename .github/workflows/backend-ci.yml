@@ -1,0 +1,54 @@
+name: Backend CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: openmrs
+          POSTGRES_PASSWORD: openmrs
+          POSTGRES_DB: openmrs
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U openmrs -d openmrs"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: |
+          dotnet restore OpenMRSmoduleBackend.csproj
+          dotnet restore OpenMRSmoduleBackend.Tests/OpenMRSmoduleBackend.Tests.csproj
+
+      - name: Build
+        run: dotnet build OpenMRSmoduleBackend.Tests/OpenMRSmoduleBackend.Tests.csproj --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test OpenMRSmoduleBackend.Tests/OpenMRSmoduleBackend.Tests.csproj --configuration Release --no-build --collect:"XPlat Code Coverage"
+        env:
+          ConnectionStrings__DefaultConnection: Host=localhost;Port=5432;Database=openmrs;Username=openmrs;Password=openmrs
+          Jwt__SecretKey: 0123456789abcdef0123456789abcdef
+          Security__EncryptionKey: AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=
+          Webhooks__OpenMrs__Secret: ci-webhook-secret
+
+      - name: Docker build
+        run: docker build -t openmrs-module-backend:ci .
+
+      - name: Secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -9,9 +9,9 @@ ASP.NET Core 10 backend voor het versturen van berichten en afspraakherinneringe
 Vanuit de bovenliggende map (`2.4/`):
 
 ```bash
-./start.sh
-# Daarna de frontend apart:
-cd openmrsmodulefrontend && npm run dev
+../start.ps1
+# of op Linux/macOS:
+../start.sh
 ```
 
 ---
@@ -21,6 +21,7 @@ cd openmrsmodulefrontend && npm run dev
 ### 1. Vereisten
 
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (draait PostgreSQL + de API zelf)
+- .NET 10 SDK wanneer je zonder Docker wilt builden/testen
 - OpenMRS draaiend op poort `3032` (zie `openmrs-distro-referenceapplication`)
 - FakeComWorld providers draaiend op poort `1337`
 
@@ -92,11 +93,26 @@ curl -X POST http://localhost:5111/api/messages \
   -H "Content-Type: application/json" \
   -d '{
     "provider": "swiftsend",
-    "messageType": "sms",
+    "type": "SMS",
     "recipients": ["+31612345678"],
     "content": "Testbericht vanuit de communicatiemodule."
   }'
 ```
+
+## OpenMRS webhook
+
+OpenMRS stuurt afspraak-events naar:
+
+```text
+POST /api/webhooks/openmrs/appointments
+```
+
+De webhook gebruikt HMAC-SHA256 headers en maakt geplande 24u/1u reminders aan. Zie [webhookdocumentatie](docs/webhook-openmrs-backend.md).
+
+Belangrijke secrets in `.env`:
+
+- `SECURITY_ENCRYPTION_KEY`
+- `OPENMRS_WEBHOOK_SECRET`
 
 ---
 
@@ -113,4 +129,7 @@ docker stop fakecomworld
 
 - [Architectuurdocumentatie (C4)](docs/c4/README.md)
 - [ADR-logboek](docs/adr/)
+- [Requirements](docs/requirements.md)
+- [Security review](docs/security-review.md)
+- [Testing](docs/testing.md)
 - [Agent-instructies](AGENTS.md)

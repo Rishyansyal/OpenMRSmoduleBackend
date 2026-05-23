@@ -8,7 +8,8 @@ public class ApplicationDbContextFactory : IDesignTimeDbContextFactory<Applicati
     public ApplicationDbContext CreateDbContext(string[] args)
     {
         var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
-            ?? "Host=localhost;Port=5432;Database=openmrs;Username=openmrs;Password=design-time";
+            ?? throw new InvalidOperationException(
+                "Set ConnectionStrings__DefaultConnection before running EF design-time commands.");
 
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseNpgsql(connectionString)

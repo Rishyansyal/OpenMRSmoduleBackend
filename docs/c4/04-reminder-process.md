@@ -2,11 +2,14 @@
 
 Stap-voor-stap weergave van hoe een afspraakherinnering van OpenMRS naar de patiënt gaat.
 
-## Automatische flow (elke 5 minuten)
+## Webhook en automatische flow
 
 ```mermaid
 sequenceDiagram
     autonumber
+    participant OM as OpenMRS webhookmodule
+    participant API as OpenMrsWebhooksController
+    participant WS as OpenMrsWebhookService
     participant W as ReminderWorker
     participant O as OpenMRS FHIR API
     participant DB as PostgreSQL
@@ -15,15 +18,17 @@ sequenceDiagram
     participant P as Messaging Provider
     participant Pat as Patiënt
 
-    loop Elke 5 minuten
-        W->>O: GET /Encounter?date=ge{23u}&date=le{25u} (24u-venster)
-        O-->>W: Lijst van aankomende encounters
-        W->>O: GET /Encounter?date=ge{55min}&date=le{65min} (1u-venster)
-        O-->>W: Lijst van aankomende encounters
+    OM->>API: POST /api/webhooks/openmrs/appointments + HMAC headers
+    API->>API: Validate HMAC, timestamp, required headers
+    API->>WS: ProcessAppointmentAsync(event, payload)
+    WS->>DB: Upsert appointment_notifications (encrypted fields)
+    WS->>DB: Insert webhook_event_logs (payload hash)
+    WS->>DB: Create/cancel scheduled_reminders (24h en 1h)
 
-        loop Per encounter
-            W->>DB: AlreadySentAsync(encounterId, window)?
-            DB-->>W: false (nog niet verstuurd)
+    loop Elke 5 minuten
+        W->>DB: Claim due scheduled_reminders
+        DB-->>W: Reminder dispatch records
+        loop Per due reminder
             W->>B: Publish SendReminderCommand
         end
     end
@@ -33,7 +38,7 @@ sequenceDiagram
     DB-->>C: false
 
     C->>O: GET /Patient/{patientId}
-    O-->>C: PatientContact (naam, telefoon, e-mail)
+    O-->>C: PatientContact (telefoon, e-mail)
 
     alt Patiënt heeft contactgegevens
         C->>P: SendAsync(provider, recipient, content, type)
@@ -48,7 +53,7 @@ sequenceDiagram
             C-->>Pat: SMS of e-mail ontvangen
         end
     else Geen contactgegevens
-        C->>C: Log "overgeslagen" en stop
+        C->>DB: Mark scheduled reminder failed (NO_CONTACT_DETAILS)
     end
 ```
 
@@ -64,7 +69,7 @@ sequenceDiagram
 
     Dev->>API: POST /api/reminders/trigger (met JWT)
     API->>W: ProcessAsync()
-    W->>B: Publish SendReminderCommand (per encounter in venster)
+    W->>B: Publish SendReminderCommand (per due scheduled reminder)
     B-->>W: Gepubliceerd
     W-->>API: Klaar
     API-->>Dev: 200 OK { "message": "Reminder-run voltooid." }
@@ -81,11 +86,15 @@ sequenceDiagram
 
     loop Elke 24 uur
         W->>S: RunAsync()
+        S->>DB: DELETE FROM appointment_notifications WHERE start_utc < now - 14 dagen
+        DB-->>S: A records verwijderd
         S->>DB: DELETE FROM reminder_logs WHERE encounter_start < now - 14 dagen
         DB-->>S: N records verwijderd
         S->>DB: DELETE FROM message_logs WHERE sent_at < now - 365 dagen
         DB-->>S: M records verwijderd
-        S-->>W: DataRetentionResult(N, M)
-        W->>W: LogInformation(N + M verwijderd)
+        S->>DB: DELETE FROM webhook_event_logs WHERE received_at_utc < now - 365 dagen
+        DB-->>S: W records verwijderd
+        S-->>W: DataRetentionResult(N, M, A, W)
+        W->>W: LogInformation(resultaat)
     end
 ```

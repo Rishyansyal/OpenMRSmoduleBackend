@@ -47,8 +47,11 @@ public class DataRetentionWorker(
         var result = await service.RunAsync(ct);
 
         logger.LogInformation(
-            "Data-retentie voltooid: {r} reminder-logs, {m} bericht-logs verwijderd.",
-            result.ReminderLogsDeleted, result.MessageLogsDeleted);
+            "Data-retentie voltooid: {r} reminder-logs, {m} bericht-logs, {a} afspraken, {w} webhook-events verwijderd.",
+            result.ReminderLogsDeleted,
+            result.MessageLogsDeleted,
+            result.AppointmentNotificationsDeleted,
+            result.WebhookEventLogsDeleted);
 
         return result;
     }

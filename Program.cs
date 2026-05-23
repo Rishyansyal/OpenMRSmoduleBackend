@@ -18,10 +18,14 @@ using Infrastructure.OpenMrs;
 using Infrastructure.Reminders;
 using Infrastructure.Messaging.Providers;
 using Infrastructure.Persistence;
+using Infrastructure.Security;
+using Infrastructure.Webhooks;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Application.Security;
+using Application.Webhooks;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -91,6 +95,12 @@ builder.Services.AddScoped<IMessageLogRepository, MessageLogRepository>();
 builder.Services.Configure<OpenMrsOptions>(builder.Configuration.GetSection("OpenMrs"));
 builder.Services.AddScoped<IOpenMrsService, OpenMrsService>();
 
+// OpenMRS webhook integratie
+builder.Services.Configure<OpenMrsWebhookOptions>(builder.Configuration.GetSection("Webhooks:OpenMrs"));
+builder.Services.AddSingleton<IOpenMrsWebhookSignatureValidator, OpenMrsWebhookSignatureValidator>();
+builder.Services.AddScoped<IFieldEncryptionService, FieldEncryptionService>();
+builder.Services.AddScoped<IOpenMrsWebhookService, OpenMrsWebhookService>();
+
 // OpenTelemetry
 builder.Services.AddSingleton<MessagingMetrics>();
 builder.Services
@@ -145,6 +155,7 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<DataRetentionWorke
 // Afspraakherinneringen
 builder.Services.Configure<ReminderOptions>(builder.Configuration.GetSection("Reminders"));
 builder.Services.AddScoped<IReminderLogRepository, ReminderLogRepository>();
+builder.Services.AddScoped<IScheduledReminderRepository, ScheduledReminderRepository>();
 builder.Services.AddSingleton<ReminderWorker>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<ReminderWorker>());
 
@@ -206,3 +217,5 @@ app.MapIdentityApi<IdentityUser>();
 app.MapControllers();
 
 app.Run();
+
+public partial class Program;
