@@ -45,6 +45,9 @@ services:
       Messaging__LegacyLink__Password: ${MESSAGING_LEGACYLINK_PASSWORD}
       Messaging__AsyncFlow__BaseUrl: ${MESSAGING_PROVIDERS_BASE_URL:-http://host.docker.internal:1337}
       Messaging__AsyncFlow__ApiKey: ${MESSAGING_ASYNCFLOW_APIKEY}
+      RabbitMq__Host: ${RABBITMQ_HOST:-}
+      RabbitMq__Username: ${RABBITMQ_USERNAME:-guest}
+      RabbitMq__Password: ${RABBITMQ_PASSWORD:-guest}
     ports:
       - "${API_PORT:-8080}:8080"
 

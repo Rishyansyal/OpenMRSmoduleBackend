@@ -1,6 +1,8 @@
 using System.Text;
 using Application.Auth;
 using Application.OpenMrs;
+using Infrastructure.Messaging.Consumers;
+using MassTransit;
 using Application.Reminders;
 using Application.Messaging;
 using Infrastructure.Auth;
@@ -84,6 +86,35 @@ builder.Services.AddScoped<IMessageLogRepository, MessageLogRepository>();
 // OpenMRS FHIR integratie
 builder.Services.Configure<OpenMrsOptions>(builder.Configuration.GetSection("OpenMrs"));
 builder.Services.AddScoped<IOpenMrsService, OpenMrsService>();
+
+// MassTransit — in-memory voor dev, RabbitMQ voor productie
+var rabbitMqHost = builder.Configuration["RabbitMq:Host"];
+builder.Services.AddMassTransit(x =>
+{
+    x.AddConsumer<SendReminderConsumer>();
+
+    if (!string.IsNullOrEmpty(rabbitMqHost))
+    {
+        x.UsingRabbitMq((ctx, cfg) =>
+        {
+            cfg.Host(rabbitMqHost, h =>
+            {
+                h.Username(builder.Configuration["RabbitMq:Username"] ?? "guest");
+                h.Password(builder.Configuration["RabbitMq:Password"] ?? "guest");
+            });
+            cfg.UseMessageRetry(r => r.Exponential(3, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(5)));
+            cfg.ConfigureEndpoints(ctx);
+        });
+    }
+    else
+    {
+        x.UsingInMemory((ctx, cfg) =>
+        {
+            cfg.UseMessageRetry(r => r.Immediate(3));
+            cfg.ConfigureEndpoints(ctx);
+        });
+    }
+});
 
 // Data-retentie (14 dagen patiëntdata, 1 jaar meta-logs)
 builder.Services.Configure<DataRetentionOptions>(builder.Configuration.GetSection("DataRetention"));
