@@ -6,6 +6,8 @@ using Application.Messaging;
 using Infrastructure.Auth;
 using Infrastructure.Messaging;
 using Infrastructure.Messaging.Options;
+using Application.DataRetention;
+using Infrastructure.DataRetention;
 using Infrastructure.OpenMrs;
 using Infrastructure.Reminders;
 using Infrastructure.Messaging.Providers;
@@ -82,6 +84,12 @@ builder.Services.AddScoped<IMessageLogRepository, MessageLogRepository>();
 // OpenMRS FHIR integratie
 builder.Services.Configure<OpenMrsOptions>(builder.Configuration.GetSection("OpenMrs"));
 builder.Services.AddScoped<IOpenMrsService, OpenMrsService>();
+
+// Data-retentie (14 dagen patiëntdata, 1 jaar meta-logs)
+builder.Services.Configure<DataRetentionOptions>(builder.Configuration.GetSection("DataRetention"));
+builder.Services.AddScoped<IDataRetentionService, DataRetentionService>();
+builder.Services.AddSingleton<DataRetentionWorker>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<DataRetentionWorker>());
 
 // Afspraakherinneringen
 builder.Services.Configure<ReminderOptions>(builder.Configuration.GetSection("Reminders"));
