@@ -1,4 +1,5 @@
 using Application.DataRetention;
+using Infrastructure.Observability;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -7,7 +8,8 @@ namespace Infrastructure.DataRetention;
 
 public class DataRetentionService(
     ApplicationDbContext db,
-    IOptions<DataRetentionOptions> options) : IDataRetentionService
+    IOptions<DataRetentionOptions> options,
+    MessagingMetrics metrics) : IDataRetentionService
 {
     private readonly DataRetentionOptions _options = options.Value;
 
@@ -27,6 +29,7 @@ public class DataRetentionService(
             .Where(m => m.SentAt < messageCutoff)
             .ExecuteDeleteAsync(ct);
 
+        metrics.RecordDataRetentionRun(reminderDeleted, messageDeleted);
         return new DataRetentionResult(reminderDeleted, messageDeleted);
     }
 }
