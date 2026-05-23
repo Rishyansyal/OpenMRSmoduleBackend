@@ -1,6 +1,10 @@
 using System.Text;
 using Application.Auth;
+using Application.Messaging;
 using Infrastructure.Auth;
+using Infrastructure.Messaging;
+using Infrastructure.Messaging.Options;
+using Infrastructure.Messaging.Providers;
 using Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
@@ -49,6 +53,26 @@ builder.Services
 builder.Services.AddSingleton<IDbConnectionFactory, NpgsqlConnectionFactory>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+
+// Messaging providers
+builder.Services.AddHttpClient();
+builder.Services.Configure<MessagingOptions>(builder.Configuration.GetSection("Messaging"));
+builder.Services.Configure<SwiftSendOptions>(builder.Configuration.GetSection("Messaging:SwiftSend"));
+builder.Services.Configure<SecurePostOptions>(builder.Configuration.GetSection("Messaging:SecurePost"));
+builder.Services.Configure<LegacyLinkOptions>(builder.Configuration.GetSection("Messaging:LegacyLink"));
+builder.Services.Configure<AsyncFlowOptions>(builder.Configuration.GetSection("Messaging:AsyncFlow"));
+
+builder.Services.AddScoped<SwiftSendProvider>();
+builder.Services.AddScoped<LegacyLinkProvider>();
+builder.Services.AddSingleton<SecurePostProvider>(); // Singleton voor token-cache
+builder.Services.AddSingleton<AsyncFlowProvider>();
+
+builder.Services.AddScoped<IMessageProvider>(sp => sp.GetRequiredService<SwiftSendProvider>());
+builder.Services.AddScoped<IMessageProvider>(sp => sp.GetRequiredService<SecurePostProvider>());
+builder.Services.AddScoped<IMessageProvider>(sp => sp.GetRequiredService<LegacyLinkProvider>());
+builder.Services.AddScoped<IMessageProvider>(sp => sp.GetRequiredService<AsyncFlowProvider>());
+builder.Services.AddScoped<IAsyncMessageProvider>(sp => sp.GetRequiredService<AsyncFlowProvider>());
+builder.Services.AddScoped<IMessagingService, MessagingService>();
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
