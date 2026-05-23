@@ -1,9 +1,11 @@
 using System.Text;
 using Application.Auth;
+using Application.OpenMrs;
 using Application.Messaging;
 using Infrastructure.Auth;
 using Infrastructure.Messaging;
 using Infrastructure.Messaging.Options;
+using Infrastructure.OpenMrs;
 using Infrastructure.Messaging.Providers;
 using Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -74,6 +76,10 @@ builder.Services.AddScoped<IMessageProvider>(sp => sp.GetRequiredService<AsyncFl
 builder.Services.AddScoped<IAsyncMessageProvider>(sp => sp.GetRequiredService<AsyncFlowProvider>());
 builder.Services.AddScoped<IMessagingService, MessagingService>();
 builder.Services.AddScoped<IMessageLogRepository, MessageLogRepository>();
+
+// OpenMRS FHIR integratie
+builder.Services.Configure<OpenMrsOptions>(builder.Configuration.GetSection("OpenMrs"));
+builder.Services.AddScoped<IOpenMrsService, OpenMrsService>();
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
