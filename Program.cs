@@ -73,6 +73,7 @@ builder.Services.AddScoped<IMessageProvider>(sp => sp.GetRequiredService<LegacyL
 builder.Services.AddScoped<IMessageProvider>(sp => sp.GetRequiredService<AsyncFlowProvider>());
 builder.Services.AddScoped<IAsyncMessageProvider>(sp => sp.GetRequiredService<AsyncFlowProvider>());
 builder.Services.AddScoped<IMessagingService, MessagingService>();
+builder.Services.AddScoped<IMessageLogRepository, MessageLogRepository>();
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
