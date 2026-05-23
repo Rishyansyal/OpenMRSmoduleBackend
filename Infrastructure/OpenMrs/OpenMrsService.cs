@@ -46,9 +46,21 @@ public class OpenMrsService(IHttpClientFactory httpClientFactory, IOptions<OpenM
     public async Task<IEnumerable<UpcomingAppointment>> GetUpcomingAppointmentsAsync(CancellationToken ct = default)
     {
         var client = CreateClient();
-        // OpenMRS FHIR ondersteunt Encounter (niet Appointment).
-        // Haal de meest recente encounters op — in productie filter je op toekomstige datums.
         var url = $"{_options.FhirBase}/Encounter?_count=50&_sort=-date";
+        var response = await client.GetAsync(url, ct);
+        response.EnsureSuccessStatusCode();
+
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
+        return ParseAppointmentBundle(doc.RootElement).ToList();
+    }
+
+    public async Task<IEnumerable<UpcomingAppointment>> GetEncountersInRangeAsync(
+        DateTime from, DateTime to, CancellationToken ct = default)
+    {
+        var client = CreateClient();
+        var f = from.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ");
+        var t = to.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ");
+        var url = $"{_options.FhirBase}/Encounter?date=ge{f}&date=le{t}&_count=100";
         var response = await client.GetAsync(url, ct);
         response.EnsureSuccessStatusCode();
 

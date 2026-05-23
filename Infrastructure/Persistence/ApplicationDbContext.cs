@@ -9,6 +9,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     : IdentityDbContext<IdentityUser>(options)
 {
     public DbSet<MessageLog> MessageLogs => Set<MessageLog>();
+    public DbSet<ReminderLog> ReminderLogs => Set<ReminderLog>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -22,6 +23,21 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             e.HasIndex(u => u.Email).IsUnique();
             e.Property(u => u.PasswordHash).HasColumnName("password_hash").IsRequired();
             e.Property(u => u.CreatedAt).HasColumnName("created_at");
+        });
+
+        builder.Entity<ReminderLog>(e =>
+        {
+            e.ToTable("reminder_logs");
+            e.HasKey(r => r.Id);
+            e.Property(r => r.Id).HasColumnName("id");
+            e.Property(r => r.EncounterId).HasColumnName("encounter_id").IsRequired();
+            e.Property(r => r.ReminderWindow).HasColumnName("reminder_window").IsRequired();
+            e.Property(r => r.Provider).HasColumnName("provider").IsRequired();
+            e.Property(r => r.Success).HasColumnName("success");
+            e.Property(r => r.ErrorCode).HasColumnName("error_code");
+            e.Property(r => r.EncounterStart).HasColumnName("encounter_start");
+            e.Property(r => r.SentAt).HasColumnName("sent_at");
+            e.HasIndex(r => new { r.EncounterId, r.ReminderWindow });
         });
 
         builder.Entity<MessageLog>(e =>
