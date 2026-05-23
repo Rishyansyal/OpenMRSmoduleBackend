@@ -1,6 +1,7 @@
 using System.Text;
 using Application.Auth;
 using Application.OpenMrs;
+using Application.Security;
 using Infrastructure.Messaging.Consumers;
 using Infrastructure.Observability;
 using MassTransit;
@@ -18,6 +19,7 @@ using Infrastructure.OpenMrs;
 using Infrastructure.Reminders;
 using Infrastructure.Messaging.Providers;
 using Infrastructure.Persistence;
+using Infrastructure.Security;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -61,6 +63,10 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 builder.Services
     .AddIdentityApiEndpoints<IdentityUser>()
     .AddEntityFrameworkStores<ApplicationDbContext>();
+
+// Encryptie (AES-256-GCM)
+builder.Services.Configure<EncryptionOptions>(builder.Configuration.GetSection("Encryption"));
+builder.Services.AddSingleton<IEncryptionService, AesEncryptionService>();
 
 builder.Services.AddSingleton<IDbConnectionFactory, NpgsqlConnectionFactory>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();

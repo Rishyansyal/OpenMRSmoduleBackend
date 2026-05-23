@@ -1,11 +1,15 @@
+using Application.Security;
 using Domain;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace Infrastructure.Persistence;
 
-public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
+public class ApplicationDbContext(
+    DbContextOptions<ApplicationDbContext> options,
+    IEncryptionService encryption)
     : IdentityDbContext<IdentityUser>(options)
 {
     public DbSet<MessageLog> MessageLogs => Set<MessageLog>();
@@ -14,13 +18,19 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
+
+        var encryptConverter = new ValueConverter<string, string>(
+            v => encryption.Encrypt(v),
+            v => encryption.Decrypt(v));
+
         builder.Entity<User>(e =>
         {
             e.ToTable("users");
             e.HasKey(u => u.Id);
             e.Property(u => u.Id).HasColumnName("id");
-            e.Property(u => u.Email).HasColumnName("email").IsRequired();
-            e.HasIndex(u => u.Email).IsUnique();
+            e.Property(u => u.Email).HasColumnName("email").IsRequired().HasConversion(encryptConverter);
+            e.Property(u => u.EmailHash).HasColumnName("email_hash").IsRequired();
+            e.HasIndex(u => u.EmailHash).IsUnique();
             e.Property(u => u.PasswordHash).HasColumnName("password_hash").IsRequired();
             e.Property(u => u.CreatedAt).HasColumnName("created_at");
         });
@@ -30,14 +40,15 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             e.ToTable("reminder_logs");
             e.HasKey(r => r.Id);
             e.Property(r => r.Id).HasColumnName("id");
-            e.Property(r => r.EncounterId).HasColumnName("encounter_id").IsRequired();
+            e.Property(r => r.EncounterId).HasColumnName("encounter_id").IsRequired().HasConversion(encryptConverter);
+            e.Property(r => r.EncounterIdHash).HasColumnName("encounter_id_hash").IsRequired();
             e.Property(r => r.ReminderWindow).HasColumnName("reminder_window").IsRequired();
             e.Property(r => r.Provider).HasColumnName("provider").IsRequired();
             e.Property(r => r.Success).HasColumnName("success");
             e.Property(r => r.ErrorCode).HasColumnName("error_code");
             e.Property(r => r.EncounterStart).HasColumnName("encounter_start");
             e.Property(r => r.SentAt).HasColumnName("sent_at");
-            e.HasIndex(r => new { r.EncounterId, r.ReminderWindow });
+            e.HasIndex(r => new { r.EncounterIdHash, r.ReminderWindow });
         });
 
         builder.Entity<MessageLog>(e =>
