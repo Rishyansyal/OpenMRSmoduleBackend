@@ -1,8 +1,8 @@
-using Application.Messaging.Commands;
+using Application.Messaging;
 using Application.OpenMrs;
 using Application.Reminders;
+using Domain;
 using Infrastructure.Reminders;
-using MassTransit;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
@@ -16,7 +16,7 @@ public class RemindersController(
     ReminderWorker reminderWorker,
     IReminderLogRepository reminderLogRepository,
     IOpenMrsService openMrsService,
-    IBus bus,
+    IMessagingService messagingService,
     IOptions<ReminderOptions> reminderOptions) : ControllerBase
 {
     /// <summary>Handmatig een reminder-run triggeren — handig voor testen.</summary>
@@ -28,7 +28,7 @@ public class RemindersController(
     }
 
     /// <summary>
-    /// Stuurt een demo-herinnering voor een bestaande encounter, ongeacht het tijdstip.
+    /// Stuurt een demo-herinnering synchroon zodat het direct zichtbaar is in de logs.
     /// Bedoeld voor presentaties waarbij geen toekomstige afspraken in OpenMRS staan.
     /// </summary>
     [HttpPost("trigger/demo")]
@@ -36,24 +36,39 @@ public class RemindersController(
     {
         var encounters = await openMrsService.GetUpcomingAppointmentsAsync(ct);
         var encounter = encounters.FirstOrDefault();
-
         if (encounter is null)
             return NotFound(new { message = "Geen encounters gevonden in OpenMRS." });
 
-        await bus.Publish(new SendReminderCommand(
-            encounter.Id,
-            encounter.PatientId,
-            "demo",
-            DateTime.UtcNow.AddHours(24),
-            encounter.ServiceType,
-            reminderOptions.Value.DefaultProvider), ct);
+        var patient = await openMrsService.GetPatientAsync(encounter.PatientId, ct);
+        if (patient is null)
+            return NotFound(new { message = "Patiënt niet gevonden in OpenMRS." });
+
+        var recipient = patient.Phone ?? patient.Email ?? "demo@example.com";
+        var provider = reminderOptions.Value.DefaultProvider;
+        var content = $"Demo: u heeft een afspraak op {encounter.Start:dddd d MMMM 'om' HH:mm}.";
+
+        var result = await messagingService.SendAsync(
+            provider,
+            new SendMessageRequest([recipient], content, patient.Phone is not null ? "SMS" : "EMAIL"),
+            ct);
+
+        await reminderLogRepository.LogAsync(new ReminderLog
+        {
+            EncounterId = encounter.Id,
+            ReminderWindow = "demo",
+            Provider = provider,
+            Success = result.Success,
+            ErrorCode = result.Success ? null : "SEND_ERROR",
+            EncounterStart = encounter.Start.ToUniversalTime(),
+            PatientName = patient.DisplayName
+        }, ct);
 
         return Ok(new
         {
-            message = $"Demo-herinnering verstuurd voor encounter {encounter.Id}.",
+            message = $"Demo-herinnering verstuurd voor {patient.DisplayName} via {provider}.",
             encounterId = encounter.Id,
-            patientId = encounter.PatientId,
-            provider = reminderOptions.Value.DefaultProvider
+            patientName = patient.DisplayName,
+            provider
         });
     }
 
