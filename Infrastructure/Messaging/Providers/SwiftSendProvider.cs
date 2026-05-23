@@ -25,12 +25,18 @@ public class SwiftSendProvider(
             httpRequest.Headers.Add("X-STUDENT-GROUP", _studentGroup);
             httpRequest.Content = JsonContent.Create(new
             {
-                type = request.Type,
+                type       = request.Type,
                 recipients = request.Recipients,
-                content = request.Content
+                content    = request.Content
             });
 
             var response = await client.SendAsync(httpRequest, ct);
+
+            // Controleer HTTP-status vóór JSON-deserialisatie.
+            // Bij 4xx/5xx zou ReadFromJsonAsync een HTML error-pagina proberen te parsen.
+            if (!response.IsSuccessStatusCode)
+                return new SendMessageResult(false, null, $"HTTP {(int)response.StatusCode}", []);
+
             var body = await response.Content.ReadFromJsonAsync<SwiftSendResponse>(cancellationToken: ct);
 
             if (body is null)
@@ -46,3 +52,4 @@ public class SwiftSendProvider(
 
     private record SwiftSendResponse(bool Success, string? MessageId, string[]? FailedRecipients, string? Error);
 }
+

@@ -6,8 +6,10 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+    # Security: geen publieke port binding — DB is alleen bereikbaar vanuit het interne
+    # Docker-netwerk (backend). Gebruik docker-compose.override.yml voor lokale DB-toegang.
+    # ports:
+    #   - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -15,6 +17,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    networks:
+      - backend
 
   api:
     build:
@@ -51,6 +55,13 @@ services:
       RabbitMq__Password: ${RABBITMQ_PASSWORD:-guest}
     ports:
       - "${API_PORT:-8080}:8080"
+    networks:
+      - backend
 
 volumes:
   pgdata:
+
+networks:
+  backend:
+    driver: bridge
+    internal: false  # API moet naar buiten (extern verkeer); DB niet
