@@ -208,7 +208,6 @@ app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapIdentityApi<IdentityUser>();
 app.MapControllers();
 
 app.Run();
