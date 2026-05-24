@@ -1,3 +1,4 @@
+using Application.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 
@@ -15,6 +16,15 @@ public class ApplicationDbContextFactory : IDesignTimeDbContextFactory<Applicati
             .UseNpgsql(connectionString)
             .Options;
 
-        return new ApplicationDbContext(options);
+        return new ApplicationDbContext(options, new NullEncryptionService());
     }
+}
+
+// Stub uitsluitend voor design-time EF Core tools (migrations).
+// Encrypt/decrypt worden niet aangeroepen tijdens migraties.
+internal sealed class NullEncryptionService : IEncryptionService
+{
+    public string Encrypt(string plaintext) => plaintext;
+    public string Decrypt(string ciphertext) => ciphertext;
+    public string Hash(string value) => value;
 }
