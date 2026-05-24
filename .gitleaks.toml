@@ -1,0 +1,14 @@
+[allowlist]
+description = "Allow documented placeholders and demo-only examples"
+paths = [
+  '''\.env\.example$''',
+  '''README\.md$''',
+  '''docs/.*'''
+]
+regexes = [
+  '''change-me''',
+  '''replace-with''',
+  '''your-api-key-here''',
+  '''Admin123!''',
+  '''guest'''
+]
