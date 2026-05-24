@@ -4,13 +4,20 @@ using Microsoft.EntityFrameworkCore.Design;
 
 namespace Infrastructure.Persistence;
 
+/// <summary>
+/// Design-time factory voor EF Core migraties (<c>dotnet ef migrations add …</c>).
+/// Leest de connection string uitsluitend uit de omgevingsvariabele
+/// <c>ConnectionStrings__DefaultConnection</c> — geen hardcoded fallback om
+/// onbedoelde verbinding met een lokale database te voorkomen.
+/// </summary>
 public class ApplicationDbContextFactory : IDesignTimeDbContextFactory<ApplicationDbContext>
 {
     public ApplicationDbContext CreateDbContext(string[] args)
     {
         var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
             ?? throw new InvalidOperationException(
-                "Set ConnectionStrings__DefaultConnection before running EF design-time commands.");
+                "Stel de env var 'ConnectionStrings__DefaultConnection' in vóór het uitvoeren van migraties. " +
+                "Voorbeeld: $Env:ConnectionStrings__DefaultConnection='Host=localhost;Port=5432;Database=openmrs;Username=openmrs;Password=...'");
 
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseNpgsql(connectionString)

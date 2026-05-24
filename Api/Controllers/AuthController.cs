@@ -1,6 +1,7 @@
 using Application.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
 
 namespace Api.Controllers;
@@ -9,6 +10,8 @@ namespace Api.Controllers;
 [Route("[controller]")]
 public class AuthController(IAuthService authService) : ControllerBase
 {
+    [AllowAnonymous]
+    [EnableRateLimiting("AuthPolicy")]
     [HttpPost("register")]
     public async Task<IActionResult> Register(RegisterRequest request, CancellationToken ct)
     {
@@ -17,12 +20,16 @@ public class AuthController(IAuthService authService) : ControllerBase
             var result = await authService.RegisterAsync(request, ct);
             return Ok(result);
         }
-        catch (InvalidOperationException ex)
+        catch (InvalidOperationException)
         {
-            return Conflict(new { error = ex.Message });
+            // Geef GEEN interne foutmelding terug — dit voorkomt e-mail-enumeratie.
+            // Een aanvaller mag niet weten of een e-mailadres al bestaat.
+            return Conflict(new { error = "A user with the provided details already exists." });
         }
     }
 
+    [AllowAnonymous]
+    [EnableRateLimiting("AuthPolicy")]
     [HttpPost("login")]
     public async Task<IActionResult> Login(LoginRequest request, CancellationToken ct)
     {
@@ -41,8 +48,9 @@ public class AuthController(IAuthService authService) : ControllerBase
     [HttpGet("me")]
     public IActionResult Me()
     {
-        var id = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var id    = User.FindFirstValue(ClaimTypes.NameIdentifier);
         var email = User.FindFirstValue(ClaimTypes.Email);
         return Ok(new { id, email });
     }
 }
+

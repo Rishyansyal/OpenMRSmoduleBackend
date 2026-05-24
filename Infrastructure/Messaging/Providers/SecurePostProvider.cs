@@ -6,6 +6,10 @@ using Microsoft.Extensions.Options;
 
 namespace Infrastructure.Messaging.Providers;
 
+/// <summary>
+/// Singleton provider voor het SecurePost messaging platform.
+/// Beheert een OAuth 2.0 bearer-token met thread-veilige invalidatie via SemaphoreSlim.
+/// </summary>
 // Singleton lifetime: token cache moet worden gedeeld over requests.
 public class SecurePostProvider : IMessageProvider
 {
@@ -13,7 +17,8 @@ public class SecurePostProvider : IMessageProvider
     private readonly SecurePostOptions _options;
     private readonly string _studentGroup;
 
-    private string? _cachedToken;
+    // volatile zorgt voor memory-visibility: writes in lock zijn zichtbaar in de fast-path check
+    private volatile string? _cachedToken;
     private DateTime _tokenExpiresAt = DateTime.MinValue;
     private readonly SemaphoreSlim _tokenLock = new(1, 1);
 
@@ -25,19 +30,20 @@ public class SecurePostProvider : IMessageProvider
         IOptions<MessagingOptions> messagingOptions)
     {
         _httpClientFactory = httpClientFactory;
-        _options = options.Value;
-        _studentGroup = messagingOptions.Value.StudentGroup;
+        _options           = options.Value;
+        _studentGroup      = messagingOptions.Value.StudentGroup;
     }
 
     private async Task<string?> GetTokenAsync(CancellationToken ct)
     {
+        // Fast path: token nog geldig (geen lock nodig)
         if (_cachedToken is not null && DateTime.UtcNow < _tokenExpiresAt)
             return _cachedToken;
 
         await _tokenLock.WaitAsync(ct);
         try
         {
-            // Double-check after acquiring lock
+            // Double-check na het verkrijgen van de lock
             if (_cachedToken is not null && DateTime.UtcNow < _tokenExpiresAt)
                 return _cachedToken;
 
@@ -46,7 +52,7 @@ public class SecurePostProvider : IMessageProvider
             request.Headers.Add("X-STUDENT-GROUP", _studentGroup);
             request.Content = JsonContent.Create(new
             {
-                clientId = _options.ClientId,
+                clientId     = _options.ClientId,
                 clientSecret = _options.ClientSecret
             });
 
@@ -60,6 +66,24 @@ public class SecurePostProvider : IMessageProvider
             // 10s buffer voorkomt gebruik van bijna-verlopen token
             _tokenExpiresAt = DateTime.UtcNow.AddSeconds(tokenResponse.ExpiresIn - 10);
             return _cachedToken;
+        }
+        finally
+        {
+            _tokenLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// Invalideert de token-cache op een thread-veilige manier.
+    /// De invalidatie vindt altijd binnen de lock plaats om race conditions te voorkomen.
+    /// </summary>
+    private async Task InvalidateTokenAsync(CancellationToken ct)
+    {
+        await _tokenLock.WaitAsync(ct);
+        try
+        {
+            _cachedToken    = null;
+            _tokenExpiresAt = DateTime.MinValue;
         }
         finally
         {
@@ -103,17 +127,18 @@ public class SecurePostProvider : IMessageProvider
             httpRequest.Headers.Add("X-STUDENT-GROUP", _studentGroup);
             httpRequest.Content = JsonContent.Create(new
             {
-                format = request.Type,
+                format    = request.Type,
                 recipient,
-                body = request.Content,
-                subject = request.Subject
+                body      = request.Content,
+                subject   = request.Subject
             });
 
             var response = await client.SendAsync(httpRequest, ct);
 
             if (response.StatusCode == HttpStatusCode.Unauthorized && attempt == 0)
             {
-                _cachedToken = null;
+                // Invalideert token BINNEN lock om race condition te voorkomen
+                await InvalidateTokenAsync(ct);
                 token = await GetTokenAsync(ct);
                 if (token is null) return (false, null, "Token refresh failed");
                 continue;
