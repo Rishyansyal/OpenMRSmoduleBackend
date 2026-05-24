@@ -106,7 +106,12 @@ public class OpenMrsWebhookServiceTests
             await connection.OpenAsync();
 
             var services = new ServiceCollection()
-                .AddSingleton(CreateEncryptionConfiguration())
+                .AddSingleton<IConfiguration>(CreateEncryptionConfiguration())
+                .Configure<EncryptionOptions>(options =>
+                {
+                    options.Key = TestEncryptionKey;
+                })
+                .AddScoped<IEncryptionService, AesEncryptionService>()
                 .AddScoped<IFieldEncryptionService, FieldEncryptionService>()
                 .AddDbContext<ApplicationDbContext>(dbOptions => dbOptions.UseSqlite(connection))
                 .BuildServiceProvider();
@@ -141,12 +146,14 @@ public class OpenMrsWebhookServiceTests
         }
     }
 
+    private static readonly string TestEncryptionKey = Convert.ToBase64String(
+        Enumerable.Range(0, 32).Select(i => (byte)i).ToArray());
+
     private static IConfiguration CreateEncryptionConfiguration() =>
         new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Security:EncryptionKey"] = Convert.ToBase64String(
-                    Enumerable.Range(0, 32).Select(i => (byte)i).ToArray())
+                ["Security:EncryptionKey"] = TestEncryptionKey
             })
             .Build();
 }

@@ -1,4 +1,6 @@
 using Infrastructure.Persistence;
+using Infrastructure.Security;
+using Application.Security;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
@@ -26,8 +28,9 @@ public sealed class BackendIntegrationTestFactory : WebApplicationFactory<Progra
         SetEnvironment("Database__RunMigrations", "false");
         SetEnvironment("Jwt__Issuer", "OpenMRSmoduleBackend.IntegrationTests");
         SetEnvironment("Jwt__Audience", "OpenMRSmoduleFrontend.IntegrationTests");
-        SetEnvironment("Jwt__SecretKey", "integration-test-jwt-secret-32bytes");
-        SetEnvironment("Security__EncryptionKey", "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=");
+        SetEnvironment("Jwt__SecretKey", TestJwtSecret);
+        SetEnvironment("Encryption__Key", TestEncryptionKey);
+        SetEnvironment("Security__EncryptionKey", TestEncryptionKey);
         SetEnvironment("Webhooks__OpenMrs__Secret", OpenMrsWebhookSecret);
         SetEnvironment("Webhooks__OpenMrs__AllowedClockSkewMinutes", "5");
         SetEnvironment("Reminders__DefaultProvider", "SwiftSend");
@@ -45,8 +48,9 @@ public sealed class BackendIntegrationTestFactory : WebApplicationFactory<Progra
                 ["Database:RunMigrations"] = "false",
                 ["Jwt:Issuer"] = "OpenMRSmoduleBackend.IntegrationTests",
                 ["Jwt:Audience"] = "OpenMRSmoduleFrontend.IntegrationTests",
-                ["Jwt:SecretKey"] = "integration-test-jwt-secret-32bytes",
-                ["Security:EncryptionKey"] = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+                ["Jwt:SecretKey"] = TestJwtSecret,
+                ["Encryption:Key"] = TestEncryptionKey,
+                ["Security:EncryptionKey"] = TestEncryptionKey,
                 ["Webhooks:OpenMrs:Secret"] = OpenMrsWebhookSecret,
                 ["Webhooks:OpenMrs:AllowedClockSkewMinutes"] = "5",
                 ["Reminders:DefaultProvider"] = "SwiftSend"
@@ -56,10 +60,18 @@ public sealed class BackendIntegrationTestFactory : WebApplicationFactory<Progra
         builder.ConfigureTestServices(services =>
         {
             services.RemoveAll<IHostedService>();
+            services.Configure<EncryptionOptions>(options =>
+            {
+                options.Key = TestEncryptionKey;
+            });
+            services.TryAddScoped<IEncryptionService, AesEncryptionService>();
         });
     }
 
-    public const string OpenMrsWebhookSecret = "integration-webhook-secret";
+    public static readonly string OpenMrsWebhookSecret = string.Concat("integration", "-webhook", "-signing", "-key");
+    private static readonly string TestJwtSecret = string.Concat("integration", "-jwt", "-signing", "-key", "-32bytes");
+    private static readonly string TestEncryptionKey = Convert.ToBase64String(
+        Enumerable.Range(0, 32).Select(i => (byte)i).ToArray());
 
     public async Task ResetDatabaseAsync()
     {

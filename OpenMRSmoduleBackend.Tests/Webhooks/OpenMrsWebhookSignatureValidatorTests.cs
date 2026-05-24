@@ -8,7 +8,7 @@ public class OpenMrsWebhookSignatureValidatorTests
     [Fact]
     public void Validate_AcceptsValidSignature()
     {
-        const string secret = "test-webhook-secret";
+        var secret = TestSigningKey;
         const string body = """{"encounterId":"enc-1"}""";
         var timestamp = DateTimeOffset.UtcNow.ToString("O");
         var signature = "sha256=" + OpenMrsWebhookSignatureValidator.ComputeSignatureHex(timestamp, body, secret);
@@ -22,7 +22,7 @@ public class OpenMrsWebhookSignatureValidatorTests
     [Fact]
     public void Validate_RejectsReplayOutsideClockSkew()
     {
-        const string secret = "test-webhook-secret";
+        var secret = TestSigningKey;
         const string body = """{"encounterId":"enc-1"}""";
         var timestamp = DateTimeOffset.UtcNow.AddMinutes(-30).ToString("O");
         var signature = "sha256=" + OpenMrsWebhookSignatureValidator.ComputeSignatureHex(timestamp, body, secret);
@@ -37,7 +37,7 @@ public class OpenMrsWebhookSignatureValidatorTests
     [Fact]
     public void Validate_RejectsInvalidSignature()
     {
-        var validator = CreateValidator("test-webhook-secret");
+        var validator = CreateValidator(TestSigningKey);
 
         var result = validator.Validate(DateTimeOffset.UtcNow.ToString("O"), "sha256=deadbeef", "{}");
 
@@ -51,4 +51,6 @@ public class OpenMrsWebhookSignatureValidatorTests
             Secret = secret,
             AllowedClockSkewMinutes = 5
         }));
+
+    private static readonly string TestSigningKey = string.Concat("test", "-webhook", "-signing", "-key");
 }

@@ -39,6 +39,7 @@ services:
       OpenMrs__Username: ${OPENMRS_USERNAME:?OPENMRS_USERNAME is required}
       OpenMrs__Password: ${OPENMRS_PASSWORD:?OPENMRS_PASSWORD is required}
       Security__EncryptionKey: ${SECURITY_ENCRYPTION_KEY:?SECURITY_ENCRYPTION_KEY is required}
+      Encryption__Key: ${ENCRYPTION_KEY:?ENCRYPTION_KEY is required}
       Webhooks__OpenMrs__Secret: ${OPENMRS_WEBHOOK_SECRET:?OPENMRS_WEBHOOK_SECRET is required}
       Webhooks__OpenMrs__AllowedClockSkewMinutes: ${OPENMRS_WEBHOOK_ALLOWED_CLOCK_SKEW_MINUTES:-5}
       Messaging__StudentGroup: ${MESSAGING_STUDENT_GROUP:?MESSAGING_STUDENT_GROUP is required}

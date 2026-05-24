@@ -25,7 +25,6 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using Application.Security;
 using Application.Webhooks;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -110,6 +109,8 @@ builder.Services.AddScoped<IOpenMrsService, OpenMrsService>();
 // OpenMRS webhook integratie
 builder.Services.Configure<OpenMrsWebhookOptions>(builder.Configuration.GetSection("Webhooks:OpenMrs"));
 builder.Services.AddSingleton<IOpenMrsWebhookSignatureValidator, OpenMrsWebhookSignatureValidator>();
+builder.Services.Configure<EncryptionOptions>(builder.Configuration.GetSection("Encryption"));
+builder.Services.AddScoped<IEncryptionService, AesEncryptionService>();
 builder.Services.AddScoped<IFieldEncryptionService, FieldEncryptionService>();
 builder.Services.AddScoped<IOpenMrsWebhookService, OpenMrsWebhookService>();
 
