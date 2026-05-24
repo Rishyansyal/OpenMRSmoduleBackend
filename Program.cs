@@ -20,10 +20,12 @@ using Infrastructure.Reminders;
 using Infrastructure.Messaging.Providers;
 using Infrastructure.Persistence;
 using Infrastructure.Security;
+using Infrastructure.Webhooks;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Application.Webhooks;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -57,18 +59,25 @@ builder.Services.AddCors(options =>
     });
 });
 
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseNpgsql(connectionString));
+var databaseProvider = builder.Configuration["Database:Provider"] ?? "Postgres";
+if (databaseProvider.Equals("Sqlite", StringComparison.OrdinalIgnoreCase))
+{
+    builder.Services.AddDbContext<ApplicationDbContext>(options =>
+        options.UseSqlite(connectionString));
+    builder.Services.AddSingleton<IDbConnectionFactory>(_ =>
+        new SqliteConnectionFactory(connectionString));
+}
+else
+{
+    builder.Services.AddDbContext<ApplicationDbContext>(options =>
+        options.UseNpgsql(connectionString));
+    builder.Services.AddSingleton<IDbConnectionFactory, NpgsqlConnectionFactory>();
+}
 
 builder.Services
     .AddIdentityApiEndpoints<IdentityUser>()
     .AddEntityFrameworkStores<ApplicationDbContext>();
 
-// Encryptie (AES-256-GCM)
-builder.Services.Configure<EncryptionOptions>(builder.Configuration.GetSection("Encryption"));
-builder.Services.AddSingleton<IEncryptionService, AesEncryptionService>();
-
-builder.Services.AddSingleton<IDbConnectionFactory, NpgsqlConnectionFactory>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 
@@ -97,6 +106,14 @@ builder.Services.AddScoped<IMessageLogRepository, MessageLogRepository>();
 builder.Services.Configure<OpenMrsOptions>(builder.Configuration.GetSection("OpenMrs"));
 builder.Services.AddScoped<IOpenMrsService, OpenMrsService>();
 
+// OpenMRS webhook integratie
+builder.Services.Configure<OpenMrsWebhookOptions>(builder.Configuration.GetSection("Webhooks:OpenMrs"));
+builder.Services.AddSingleton<IOpenMrsWebhookSignatureValidator, OpenMrsWebhookSignatureValidator>();
+builder.Services.Configure<EncryptionOptions>(builder.Configuration.GetSection("Encryption"));
+builder.Services.AddScoped<IEncryptionService, AesEncryptionService>();
+builder.Services.AddScoped<IFieldEncryptionService, FieldEncryptionService>();
+builder.Services.AddScoped<IOpenMrsWebhookService, OpenMrsWebhookService>();
+
 // OpenTelemetry
 builder.Services.AddSingleton<MessagingMetrics>();
 builder.Services
@@ -119,15 +136,23 @@ builder.Services.AddMassTransit(x =>
 {
     x.AddConsumer<SendReminderConsumer>();
 
-    if (!string.IsNullOrEmpty(rabbitMqHost))
+if (!string.IsNullOrEmpty(rabbitMqHost))
+{
+    var rabbitMqUsername = builder.Configuration["RabbitMq:Username"];
+    var rabbitMqPassword = builder.Configuration["RabbitMq:Password"];
+    if (string.IsNullOrWhiteSpace(rabbitMqUsername) || string.IsNullOrWhiteSpace(rabbitMqPassword))
     {
-        x.UsingRabbitMq((ctx, cfg) =>
+        throw new InvalidOperationException(
+            "RabbitMq:Username and RabbitMq:Password must be configured when RabbitMq:Host is set.");
+    }
+
+    x.UsingRabbitMq((ctx, cfg) =>
+    {
+        cfg.Host(rabbitMqHost, h =>
         {
-            cfg.Host(rabbitMqHost, h =>
-            {
-                h.Username(builder.Configuration["RabbitMq:Username"] ?? "guest");
-                h.Password(builder.Configuration["RabbitMq:Password"] ?? "guest");
-            });
+            h.Username(rabbitMqUsername);
+            h.Password(rabbitMqPassword);
+        });
             cfg.UseMessageRetry(r => r.Exponential(3, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(5)));
             cfg.ConfigureEndpoints(ctx);
         });
@@ -151,6 +176,7 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<DataRetentionWorke
 // Afspraakherinneringen
 builder.Services.Configure<ReminderOptions>(builder.Configuration.GetSection("Reminders"));
 builder.Services.AddScoped<IReminderLogRepository, ReminderLogRepository>();
+builder.Services.AddScoped<IScheduledReminderRepository, ScheduledReminderRepository>();
 builder.Services.AddSingleton<ReminderWorker>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<ReminderWorker>());
 
@@ -180,8 +206,9 @@ builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-using (var scope = app.Services.CreateScope())
+if (app.Configuration.GetValue("Database:RunMigrations", true))
 {
+    using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     await db.Database.MigrateAsync();
 }
@@ -212,3 +239,5 @@ app.MapIdentityApi<IdentityUser>();
 app.MapControllers();
 
 app.Run();
+
+public partial class Program;

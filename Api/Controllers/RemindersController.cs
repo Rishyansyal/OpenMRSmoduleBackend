@@ -10,7 +10,8 @@ namespace Api.Controllers;
 [Authorize]
 public class RemindersController(
     ReminderWorker reminderWorker,
-    IReminderLogRepository reminderLogRepository) : ControllerBase
+    IReminderLogRepository reminderLogRepository,
+    IScheduledReminderRepository scheduledReminderRepository) : ControllerBase
 {
     /// <summary>Handmatig een reminder-run triggeren — handig voor testen.</summary>
     [HttpPost("trigger")]
@@ -25,5 +26,12 @@ public class RemindersController(
     {
         var logs = await reminderLogRepository.GetRecentAsync(count, ct);
         return Ok(logs);
+    }
+
+    [HttpGet("scheduled")]
+    public async Task<IActionResult> GetScheduled([FromQuery] int count = 50, CancellationToken ct = default)
+    {
+        var scheduled = await scheduledReminderRepository.GetRecentAsync(count, ct);
+        return Ok(scheduled);
     }
 }

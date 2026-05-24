@@ -11,7 +11,7 @@ C4Context
 
     System(module, "OpenMRS Communicatiemodule", "Verstuurt afspraakherinneringen, beheert berichtenhistorie en integreert met OpenMRS en messaging providers")
 
-    System_Ext(openmrs, "OpenMRS EMR", "Elektronisch medisch dossier. Bron van patiënt- en afspraakdata via FHIR R4 API")
+    System_Ext(openmrs, "OpenMRS EMR", "Elektronisch medisch dossier. Bron van patiëntdata via FHIR R4 en afspraak-events via signed webhooks")
 
     System_Ext(swiftsend, "SwiftSend", "REST messaging provider — SMS en e-mail via X-API-KEY")
     System_Ext(securepost, "SecurePost", "REST messaging provider — SMS, e-mail en push via JWT")
@@ -19,7 +19,8 @@ C4Context
     System_Ext(asyncflow, "AsyncFlow", "Async messaging provider — berichten via queue met statuspolling")
 
     Rel(zorgmedewerker, module, "Stuurt berichten, bekijkt geschiedenis en patiënten", "HTTPS")
-    Rel(module, openmrs, "Haalt patiënten en afspraken op", "FHIR R4 / HTTPS")
+    Rel(openmrs, module, "Stuurt afspraak-events", "Signed webhook / HTTPS")
+    Rel(module, openmrs, "Haalt patiëntcontact op", "FHIR R4 / HTTPS")
     Rel(module, swiftsend, "Verstuurt SMS/e-mail", "REST / HTTPS")
     Rel(module, securepost, "Verstuurt SMS/e-mail/push", "REST / HTTPS")
     Rel(module, legacylink, "Verstuurt SMS", "SOAP / HTTPS")

@@ -3,11 +3,11 @@ services:
     image: postgres:17-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "${POSTGRES_PORT:-127.0.0.1:5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -15,6 +15,10 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - backend
 
   api:
     build:
@@ -26,31 +30,47 @@ services:
         condition: service_healthy
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
-      Encryption__Key: ${ENCRYPTION_KEY}
-      ConnectionStrings__DefaultConnection: "Host=db;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
-      Jwt__SecretKey: ${JWT_SECRET}
+      ConnectionStrings__DefaultConnection: "Host=db;Port=5432;Database=${POSTGRES_DB:?POSTGRES_DB is required};Username=${POSTGRES_USER:?POSTGRES_USER is required};Password=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}"
+      Jwt__SecretKey: ${JWT_SECRET:?JWT_SECRET is required}
       Jwt__Issuer: OpenMRSmoduleBackend
       Jwt__Audience: OpenMRSmoduleBackend
       Cors__AllowedOrigins: ${ALLOWED_ORIGINS:-http://localhost:3001}
       OpenMrs__BaseUrl: ${OPENMRS_BASE_URL:-http://host.docker.internal:3032}
-      OpenMrs__Username: ${OPENMRS_USERNAME}
-      OpenMrs__Password: ${OPENMRS_PASSWORD}
-      Messaging__StudentGroup: ${MESSAGING_STUDENT_GROUP}
+      OpenMrs__Username: ${OPENMRS_USERNAME:?OPENMRS_USERNAME is required}
+      OpenMrs__Password: ${OPENMRS_PASSWORD:?OPENMRS_PASSWORD is required}
+      Security__EncryptionKey: ${SECURITY_ENCRYPTION_KEY:?SECURITY_ENCRYPTION_KEY is required}
+      Encryption__Key: ${ENCRYPTION_KEY:?ENCRYPTION_KEY is required}
+      Webhooks__OpenMrs__Secret: ${OPENMRS_WEBHOOK_SECRET:?OPENMRS_WEBHOOK_SECRET is required}
+      Webhooks__OpenMrs__AllowedClockSkewMinutes: ${OPENMRS_WEBHOOK_ALLOWED_CLOCK_SKEW_MINUTES:-5}
+      Messaging__StudentGroup: ${MESSAGING_STUDENT_GROUP:?MESSAGING_STUDENT_GROUP is required}
       Messaging__SwiftSend__BaseUrl: ${MESSAGING_PROVIDERS_BASE_URL:-http://host.docker.internal:1337}
-      Messaging__SwiftSend__ApiKey: ${MESSAGING_SWIFTSEND_APIKEY}
+      Messaging__SwiftSend__ApiKey: ${MESSAGING_SWIFTSEND_APIKEY:?MESSAGING_SWIFTSEND_APIKEY is required}
       Messaging__SecurePost__BaseUrl: ${MESSAGING_PROVIDERS_BASE_URL:-http://host.docker.internal:1337}
-      Messaging__SecurePost__ClientId: ${MESSAGING_SECUREPOST_CLIENT_ID}
-      Messaging__SecurePost__ClientSecret: ${MESSAGING_SECUREPOST_CLIENT_SECRET}
+      Messaging__SecurePost__ClientId: ${MESSAGING_SECUREPOST_CLIENT_ID:?MESSAGING_SECUREPOST_CLIENT_ID is required}
+      Messaging__SecurePost__ClientSecret: ${MESSAGING_SECUREPOST_CLIENT_SECRET:?MESSAGING_SECUREPOST_CLIENT_SECRET is required}
       Messaging__LegacyLink__BaseUrl: ${MESSAGING_PROVIDERS_BASE_URL:-http://host.docker.internal:1337}
-      Messaging__LegacyLink__Username: ${MESSAGING_LEGACYLINK_USERNAME}
-      Messaging__LegacyLink__Password: ${MESSAGING_LEGACYLINK_PASSWORD}
+      Messaging__LegacyLink__Username: ${MESSAGING_LEGACYLINK_USERNAME:?MESSAGING_LEGACYLINK_USERNAME is required}
+      Messaging__LegacyLink__Password: ${MESSAGING_LEGACYLINK_PASSWORD:?MESSAGING_LEGACYLINK_PASSWORD is required}
       Messaging__AsyncFlow__BaseUrl: ${MESSAGING_PROVIDERS_BASE_URL:-http://host.docker.internal:1337}
-      Messaging__AsyncFlow__ApiKey: ${MESSAGING_ASYNCFLOW_APIKEY}
+      Messaging__AsyncFlow__ApiKey: ${MESSAGING_ASYNCFLOW_APIKEY:?MESSAGING_ASYNCFLOW_APIKEY is required}
       RabbitMq__Host: ${RABBITMQ_HOST:-}
-      RabbitMq__Username: ${RABBITMQ_USERNAME:-guest}
-      RabbitMq__Password: ${RABBITMQ_PASSWORD:-guest}
+      RabbitMq__Username: ${RABBITMQ_USERNAME:-}
+      RabbitMq__Password: ${RABBITMQ_PASSWORD:-}
     ports:
-      - "${API_PORT:-8080}:8080"
+      - "${API_PORT:-127.0.0.1:5111}:8080"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - backend
 
 volumes:
   pgdata:
+
+networks:
+  backend:
+    driver: bridge
