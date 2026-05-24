@@ -65,3 +65,19 @@ curl -X POST http://localhost:5111/api/webhooks/openmrs/appointments \
   -H "X-OpenMRS-Signature: sha256=$SIG" \
   -d "$BODY"
 ```
+
+## Technische Implementatie
+
+De webhook logica in de backend is onderverdeeld in een controller en een service:
+
+- **Controller (`Api.Controllers.OpenMrsWebhooksController`)**: 
+  - Ontvangt de POST-request op `/api/webhooks/openmrs/appointments`.
+  - Valideert direct de HMAC-SHA256 handtekening (via `IOpenMrsWebhookSignatureValidator`) om te garanderen dat de payload echt van OpenMRS komt.
+  - Controleert of de vereiste headers aanwezig zijn en deserialiseert de JSON.
+- **Service (`Infrastructure.Webhooks.OpenMrsWebhookService`)**:
+  - **Deduplicatie**: Controleert in de `WebhookEventLogs` tabel of de `X-OpenMRS-Event-Id` al eerder is verwerkt. Zo ja, dan retouneert hij direct een succesresponse zonder dubbel werk te doen.
+  - **Transactie & Logging**: Start een database-transactie en slaat een log van het event op in `WebhookEventLog`.
+  - **Encryptie**: Privacygevoelige velden zoals de `PatientId`, `PatientDisplay`, `ServiceType`, `Location`, en `Instructions` worden versleuteld opgeslagen met behulp van de `IFieldEncryptionService`.
+  - **Reminders Herberekenen**: 
+    - Bestaande reminders voor deze specifieke afspraak (die nog de status `Pending` of `Queued` hebben) worden geannuleerd.
+    - Als de afspraak niet is geannuleerd en het starttijdstip nog in de toekomst ligt, worden er nieuwe reminders ingepland voor 24 uur en 1 uur vóór de afspraak.
