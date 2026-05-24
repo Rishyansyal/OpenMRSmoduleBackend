@@ -24,6 +24,7 @@ public sealed class BackendIntegrationTests(
     public async Task HealthDb_ReturnsReachable_WhenUsingIntegrationDatabase()
     {
         using var client = factory.CreateClient();
+        await AuthenticateAsync(client, "healthcheck@example.test");
 
         var response = await client.GetAsync("/health/db");
 
