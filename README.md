@@ -80,12 +80,12 @@ Verwacht: `{"status":"Healthy"}`
 # 1. Registreer een gebruiker
 curl -X POST http://localhost:5111/auth/register \
   -H "Content-Type: application/json" \
-  -d '{"email":"admin@example.com","password":"Admin123!"}'
+  -d '{"email":"user@example.test","password":"<LOCAL_TEST_PASSWORD>"}'
 
 # 2. Login en kopieer het token
 curl -X POST http://localhost:5111/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"admin@example.com","password":"Admin123!"}'
+  -d '{"email":"user@example.test","password":"<LOCAL_TEST_PASSWORD>"}'
 
 # 3. Stuur een testbericht (vervang <TOKEN> door het JWT uit stap 2)
 curl -X POST http://localhost:5111/api/messages \

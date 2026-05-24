@@ -1,4 +1,5 @@
 using Application.Webhooks;
+using Application.Security;
 using Infrastructure.Persistence;
 using Infrastructure.Reminders;
 using Infrastructure.Security;
@@ -6,6 +7,7 @@ using Infrastructure.Webhooks;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
 namespace OpenMRSmoduleBackend.Tests.Webhooks;
@@ -98,28 +100,53 @@ public class OpenMrsWebhookServiceTests
         private readonly SqliteConnection _connection;
         public ApplicationDbContext Db { get; }
 
-        private DbFixture(SqliteConnection connection, ApplicationDbContext db)
-        {
-            _connection = connection;
-            Db = db;
-        }
-
         public static async Task<DbFixture> CreateAsync()
         {
             var connection = new SqliteConnection("DataSource=:memory:");
             await connection.OpenAsync();
-            var options = new DbContextOptionsBuilder<ApplicationDbContext>()
-                .UseSqlite(connection)
-                .Options;
-            var db = new ApplicationDbContext(options);
+
+            var services = new ServiceCollection()
+                .AddSingleton(CreateEncryptionConfiguration())
+                .AddScoped<IFieldEncryptionService, FieldEncryptionService>()
+                .AddDbContext<ApplicationDbContext>(dbOptions => dbOptions.UseSqlite(connection))
+                .BuildServiceProvider();
+
+            var scope = services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             await db.Database.EnsureCreatedAsync();
-            return new DbFixture(connection, db);
+            return new DbFixture(connection, db, scope, services);
         }
 
         public async ValueTask DisposeAsync()
         {
             await Db.DisposeAsync();
+            _scope.Dispose();
+            await _services.DisposeAsync();
             await _connection.DisposeAsync();
         }
+
+        private readonly IServiceScope _scope;
+        private readonly ServiceProvider _services;
+
+        private DbFixture(
+            SqliteConnection connection,
+            ApplicationDbContext db,
+            IServiceScope scope,
+            ServiceProvider services)
+        {
+            _connection = connection;
+            Db = db;
+            _scope = scope;
+            _services = services;
+        }
     }
+
+    private static IConfiguration CreateEncryptionConfiguration() =>
+        new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Security:EncryptionKey"] = Convert.ToBase64String(
+                    Enumerable.Range(0, 32).Select(i => (byte)i).ToArray())
+            })
+            .Build();
 }

@@ -134,15 +134,23 @@ builder.Services.AddMassTransit(x =>
 {
     x.AddConsumer<SendReminderConsumer>();
 
-    if (!string.IsNullOrEmpty(rabbitMqHost))
+if (!string.IsNullOrEmpty(rabbitMqHost))
+{
+    var rabbitMqUsername = builder.Configuration["RabbitMq:Username"];
+    var rabbitMqPassword = builder.Configuration["RabbitMq:Password"];
+    if (string.IsNullOrWhiteSpace(rabbitMqUsername) || string.IsNullOrWhiteSpace(rabbitMqPassword))
     {
-        x.UsingRabbitMq((ctx, cfg) =>
+        throw new InvalidOperationException(
+            "RabbitMq:Username and RabbitMq:Password must be configured when RabbitMq:Host is set.");
+    }
+
+    x.UsingRabbitMq((ctx, cfg) =>
+    {
+        cfg.Host(rabbitMqHost, h =>
         {
-            cfg.Host(rabbitMqHost, h =>
-            {
-                h.Username(builder.Configuration["RabbitMq:Username"] ?? "guest");
-                h.Password(builder.Configuration["RabbitMq:Password"] ?? "guest");
-            });
+            h.Username(rabbitMqUsername);
+            h.Password(rabbitMqPassword);
+        });
             cfg.UseMessageRetry(r => r.Exponential(3, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(5)));
             cfg.ConfigureEndpoints(ctx);
         });
