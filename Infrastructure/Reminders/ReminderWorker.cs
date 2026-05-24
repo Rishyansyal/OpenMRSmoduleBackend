@@ -1,5 +1,4 @@
 using Application.Messaging.Commands;
-using Application.OpenMrs;
 using Application.Reminders;
 using MassTransit;
 using Microsoft.Extensions.DependencyInjection;
@@ -44,41 +43,28 @@ public class ReminderWorker(
     public async Task ProcessAsync(CancellationToken ct)
     {
         using var scope = serviceProvider.CreateScope();
-        var openMrs = scope.ServiceProvider.GetRequiredService<IOpenMrsService>();
-        var reminderLog = scope.ServiceProvider.GetRequiredService<IReminderLogRepository>();
+        var scheduledReminders = scope.ServiceProvider.GetRequiredService<IScheduledReminderRepository>();
         var bus = scope.ServiceProvider.GetRequiredService<IBus>();
 
         var now = DateTime.UtcNow;
         var published = 0;
+        var due = await scheduledReminders.ClaimDueAsync(now, _options.BatchSize, ct);
 
-        var windows = new[]
+        foreach (var reminder in due)
         {
-            ("24h", now.AddHours(23), now.AddHours(25)),
-            ("1h",  now.AddMinutes(55), now.AddMinutes(65))
-        };
+            await bus.Publish(new SendReminderCommand(
+                reminder.ScheduledReminderId,
+                reminder.OrganizationId,
+                reminder.EncounterId,
+                reminder.PatientId,
+                reminder.ReminderWindow,
+                reminder.EncounterStart,
+                reminder.ServiceType,
+                reminder.Provider), ct);
 
-        foreach (var (window, from, to) in windows)
-        {
-            var encounters = await openMrs.GetEncountersInRangeAsync(from, to, ct);
-
-            foreach (var encounter in encounters)
-            {
-                // Controleer duplicaat vóór publicatie (ook consumer is idempotent als fallback)
-                if (await reminderLog.AlreadySentAsync(encounter.Id, window, ct))
-                    continue;
-
-                await bus.Publish(new SendReminderCommand(
-                    encounter.Id,
-                    encounter.PatientId,
-                    window,
-                    encounter.Start,
-                    encounter.ServiceType,
-                    _options.DefaultProvider), ct);
-
-                published++;
-                logger.LogDebug("SendReminderCommand gepubliceerd: encounter {id}, venster {window}.",
-                    encounter.Id, window);
-            }
+            published++;
+            logger.LogDebug("SendReminderCommand gepubliceerd: encounter {id}, venster {window}.",
+                reminder.EncounterId, reminder.ReminderWindow);
         }
 
         if (published > 0)

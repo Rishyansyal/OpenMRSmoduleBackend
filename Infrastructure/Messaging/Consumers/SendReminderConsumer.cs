@@ -14,6 +14,7 @@ public class SendReminderConsumer(
     IOpenMrsService openMrsService,
     IMessagingService messagingService,
     IReminderLogRepository reminderLogRepository,
+    IScheduledReminderRepository scheduledReminderRepository,
     MessagingMetrics metrics,
     ILogger<SendReminderConsumer> logger) : IConsumer<SendReminderCommand>
 {
@@ -33,16 +34,24 @@ public class SendReminderConsumer(
         var patient = await openMrsService.GetPatientAsync(cmd.PatientId, ct);
         if (patient is null)
         {
-            logger.LogWarning("Patiënt {id} niet gevonden voor encounter {enc}.",
-                cmd.PatientId, cmd.EncounterId);
+            logger.LogWarning("Patiënt niet gevonden voor encounter {enc}.",
+                cmd.EncounterId);
+            await scheduledReminderRepository.MarkFailedAsync(
+                cmd.ScheduledReminderId,
+                "PATIENT_NOT_FOUND",
+                ct);
             return;
         }
 
         var recipient = patient.Phone ?? patient.Email;
         if (recipient is null)
         {
-            logger.LogInformation("Patiënt {name} heeft geen contactgegevens — herinnering overgeslagen.",
-                patient.DisplayName);
+            logger.LogInformation("Patiënt voor encounter {enc} heeft geen contactgegevens — herinnering overgeslagen.",
+                cmd.EncounterId);
+            await scheduledReminderRepository.MarkFailedAsync(
+                cmd.ScheduledReminderId,
+                "NO_CONTACT_DETAILS",
+                ct);
             return;
         }
 
@@ -70,11 +79,21 @@ public class SendReminderConsumer(
         }, ct);
 
         if (result.Success)
-            logger.LogInformation("Herinnering ({window}) verstuurd naar {name}.", cmd.ReminderWindow, patient.DisplayName);
-        else
-            // Gooi een exception zodat MassTransit de retry-policy triggert
-            throw new InvalidOperationException(
-                $"Versturen mislukt voor {patient.DisplayName}: {result.Error}");
+        {
+            await scheduledReminderRepository.MarkSentAsync(cmd.ScheduledReminderId, ct);
+            logger.LogInformation("Herinnering ({window}) verstuurd voor encounter {enc}.",
+                cmd.ReminderWindow, cmd.EncounterId);
+            return;
+        }
+
+        await scheduledReminderRepository.MarkFailedAsync(
+            cmd.ScheduledReminderId,
+            "SEND_ERROR",
+            ct);
+
+        // Gooi een exception zodat MassTransit de retry-policy triggert
+        throw new InvalidOperationException(
+            $"Versturen mislukt voor encounter {cmd.EncounterId}: {result.Error}");
     }
 
     private static string BuildMessage(SendReminderCommand cmd)

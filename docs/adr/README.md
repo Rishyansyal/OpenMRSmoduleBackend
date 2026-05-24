@@ -17,3 +17,7 @@ Nieuwe ADR? Kopieer een bestaande, verhoog het nummer, en zet de status op `Prop
 - [0009 — Use MassTransit for asynchronous messaging and background services](0009-masstransit-for-async-messaging.md)
 - [0010 — Data retention and encryption policy for sensitive appointment data](0010-data-retention-and-encryption-policy.md)
 - [0011 — Use a layered folder structure within a single project](0011-layered-folder-structure.md)
+- [0012 — Signed OpenMRS webhook contract](0012-signed-openmrs-webhook-contract.md)
+- [0013 — Pragmatic automated test strategy](0013-pragmatic-automated-test-strategy.md)
+- [0014 — CI quality gates](0014-ci-quality-gates.md)
+- [0015 — Encryption and webhook security posture](0015-encryption-and-webhook-security-posture.md)

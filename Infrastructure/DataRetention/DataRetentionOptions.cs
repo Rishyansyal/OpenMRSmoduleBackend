@@ -7,4 +7,5 @@ public class DataRetentionOptions
     public int PatientDataRetentionDays { get; set; } = 14;
     // Meta-informatie (message_logs): max 1 jaar bewaren
     public int MessageLogRetentionDays { get; set; } = 365;
+    public int WebhookEventLogRetentionDays { get; set; } = 365;
 }
