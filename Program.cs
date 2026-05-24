@@ -1,6 +1,7 @@
 using System.Text;
 using Application.Auth;
 using Application.OpenMrs;
+using Application.Security;
 using Infrastructure.Messaging.Consumers;
 using Infrastructure.Observability;
 using MassTransit;

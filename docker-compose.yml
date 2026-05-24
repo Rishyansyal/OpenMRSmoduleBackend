@@ -26,6 +26,7 @@ services:
         condition: service_healthy
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      Encryption__Key: ${ENCRYPTION_KEY}
       ConnectionStrings__DefaultConnection: "Host=db;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
       Jwt__SecretKey: ${JWT_SECRET}
       Jwt__Issuer: OpenMRSmoduleBackend

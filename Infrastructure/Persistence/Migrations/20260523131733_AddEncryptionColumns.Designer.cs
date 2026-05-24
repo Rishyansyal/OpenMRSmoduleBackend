@@ -3,6 +3,7 @@ using System;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace OpenMRSmoduleBackend.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260523131733_AddEncryptionColumns")]
+    partial class AddEncryptionColumns
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -21,82 +24,6 @@ namespace OpenMRSmoduleBackend.Infrastructure.Persistence.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
-
-            modelBuilder.Entity("Domain.AppointmentNotification", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<string>("EncounterId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("encounter_id");
-
-                    b.Property<DateTime?>("EndUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("end_utc");
-
-                    b.Property<string>("InstructionsEncrypted")
-                        .HasColumnType("text")
-                        .HasColumnName("instructions_encrypted");
-
-                    b.Property<bool>("IsCancelled")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_cancelled");
-
-                    b.Property<string>("LastEventId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("last_event_id");
-
-                    b.Property<string>("LocationEncrypted")
-                        .HasColumnType("text")
-                        .HasColumnName("location_encrypted");
-
-                    b.Property<string>("OrganizationId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("organization_id");
-
-                    b.Property<string>("PatientDisplayEncrypted")
-                        .HasColumnType("text")
-                        .HasColumnName("patient_display_encrypted");
-
-                    b.Property<string>("PatientIdEncrypted")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("patient_id_encrypted");
-
-                    b.Property<string>("ServiceTypeEncrypted")
-                        .HasColumnType("text")
-                        .HasColumnName("service_type_encrypted");
-
-                    b.Property<DateTime>("StartUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("start_utc");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("status");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("OrganizationId", "EncounterId")
-                        .IsUnique();
-
-                    b.ToTable("appointment_notifications", (string)null);
-                });
 
             modelBuilder.Entity("Domain.MessageLog", b =>
                 {
@@ -151,44 +78,6 @@ namespace OpenMRSmoduleBackend.Infrastructure.Persistence.Migrations
                     b.ToTable("message_logs", (string)null);
                 });
 
-            modelBuilder.Entity("Domain.OrganizationIntegrationConfig", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<string>("DefaultProvider")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("default_provider");
-
-                    b.Property<string>("OrganizationId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("organization_id");
-
-                    b.Property<string>("TimeZoneId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("time_zone_id");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("OrganizationId")
-                        .IsUnique();
-
-                    b.ToTable("organization_integration_configs", (string)null);
-                });
-
             modelBuilder.Entity("Domain.ReminderLog", b =>
                 {
                     b.Property<Guid>("Id")
@@ -239,71 +128,6 @@ namespace OpenMRSmoduleBackend.Infrastructure.Persistence.Migrations
                     b.ToTable("reminder_logs", (string)null);
                 });
 
-            modelBuilder.Entity("Domain.ScheduledReminder", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid>("AppointmentNotificationId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("appointment_notification_id");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<string>("EncounterId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("encounter_id");
-
-                    b.Property<string>("LastErrorCode")
-                        .HasColumnType("text")
-                        .HasColumnName("last_error_code");
-
-                    b.Property<string>("OrganizationId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("organization_id");
-
-                    b.Property<string>("Provider")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("provider");
-
-                    b.Property<string>("ReminderWindow")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("reminder_window");
-
-                    b.Property<DateTime>("ScheduledForUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("scheduled_for_utc");
-
-                    b.Property<DateTime?>("SentAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("sent_at_utc");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("status");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at_utc");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AppointmentNotificationId", "ReminderWindow");
-
-                    b.HasIndex("Status", "ScheduledForUtc");
-
-                    b.ToTable("scheduled_reminders", (string)null);
-                });
-
             modelBuilder.Entity("Domain.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -336,73 +160,6 @@ namespace OpenMRSmoduleBackend.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("users", (string)null);
-                });
-
-            modelBuilder.Entity("Domain.WebhookEventLog", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<bool>("Duplicate")
-                        .HasColumnType("boolean")
-                        .HasColumnName("duplicate");
-
-                    b.Property<string>("ErrorCode")
-                        .HasColumnType("text")
-                        .HasColumnName("error_code");
-
-                    b.Property<string>("EventId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("event_id");
-
-                    b.Property<DateTimeOffset>("EventTimestamp")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("event_timestamp");
-
-                    b.Property<string>("EventType")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("event_type");
-
-                    b.Property<string>("OrganizationId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("organization_id");
-
-                    b.Property<string>("PayloadSha256")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("payload_sha256");
-
-                    b.Property<bool>("Processed")
-                        .HasColumnType("boolean")
-                        .HasColumnName("processed");
-
-                    b.Property<DateTime>("ReceivedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("received_at_utc");
-
-                    b.Property<string>("ResourceId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("resource_id");
-
-                    b.Property<string>("ResourceType")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("resource_type");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("EventId")
-                        .IsUnique();
-
-                    b.HasIndex("ReceivedAtUtc");
-
-                    b.ToTable("webhook_event_logs", (string)null);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
@@ -601,17 +358,6 @@ namespace OpenMRSmoduleBackend.Infrastructure.Persistence.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
-            modelBuilder.Entity("Domain.ScheduledReminder", b =>
-                {
-                    b.HasOne("Domain.AppointmentNotification", "AppointmentNotification")
-                        .WithMany("ScheduledReminders")
-                        .HasForeignKey("AppointmentNotificationId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("AppointmentNotification");
-                });
-
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
                 {
                     b.HasOne("Microsoft.AspNetCore.Identity.IdentityRole", null)
@@ -661,11 +407,6 @@ namespace OpenMRSmoduleBackend.Infrastructure.Persistence.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-                });
-
-            modelBuilder.Entity("Domain.AppointmentNotification", b =>
-                {
-                    b.Navigation("ScheduledReminders");
                 });
 #pragma warning restore 612, 618
         }
