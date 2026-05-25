@@ -8,7 +8,7 @@ namespace Api.Controllers;
 
 [ApiController]
 [Route("[controller]")]
-public class AuthController(IAuthService authService) : ControllerBase
+public class AuthController(IAuthService authService, ILogger<AuthController> logger) : ControllerBase
 {
     [AllowAnonymous]
     [EnableRateLimiting("AuthPolicy")]
@@ -18,10 +18,12 @@ public class AuthController(IAuthService authService) : ControllerBase
         try
         {
             var result = await authService.RegisterAsync(request, ct);
+            logger.LogInformation("Security Event: Successful registration for email {Email}", request.Email);
             return Ok(result);
         }
-        catch (InvalidOperationException)
+        catch (InvalidOperationException ex)
         {
+            logger.LogWarning("Security Event: Failed registration attempt for email {Email}. Reason: {Reason}", request.Email, ex.Message);
             // Geef GEEN interne foutmelding terug — dit voorkomt e-mail-enumeratie.
             // Een aanvaller mag niet weten of een e-mailadres al bestaat.
             return Conflict(new { error = "A user with the provided details already exists." });
@@ -36,10 +38,12 @@ public class AuthController(IAuthService authService) : ControllerBase
         try
         {
             var result = await authService.LoginAsync(request, ct);
+            logger.LogInformation("Security Event: Successful login for user {Email}", request.Email);
             return Ok(result);
         }
         catch (UnauthorizedAccessException)
         {
+            logger.LogWarning("Security Event: Failed login attempt for user {Email}", request.Email);
             return Unauthorized(new { error = "Invalid credentials." });
         }
     }

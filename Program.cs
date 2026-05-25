@@ -78,6 +78,11 @@ builder.Services.AddRateLimiter(opts =>
     opts.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
     opts.OnRejected = async (ctx, ct) =>
     {
+        var logger = ctx.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+        logger.LogWarning("Security Event: Rate limit exceeded by IP {IpAddress} on path {Path}", 
+            ctx.HttpContext.Connection.RemoteIpAddress, 
+            ctx.HttpContext.Request.Path);
+
         ctx.HttpContext.Response.Headers["Retry-After"] = "60";
         await ctx.HttpContext.Response.WriteAsJsonAsync(
             new { error = "Too many requests. Please try again later." }, ct);
@@ -361,6 +366,9 @@ else
 
 // Security headers (X-Frame-Options, CSP, etc.) — zo vroeg mogelijk in de pipeline
 app.UseMiddleware<SecurityHeadersMiddleware>();
+
+// Security events logging (401 Unauthorized / 403 Forbidden)
+app.UseMiddleware<SecurityLoggingMiddleware>();
 
 // Cookie-beleid (SameSite=Strict)
 app.UseCookiePolicy();
