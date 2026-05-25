@@ -373,12 +373,17 @@ app.UseMiddleware<SecurityLoggingMiddleware>();
 // Cookie-beleid (SameSite=Strict)
 app.UseCookiePolicy();
 
-// Rate limiting — vóór routing zodat het ook OPTIONS preflight raakt
-app.UseRateLimiter();
+// Routing expliciet uitvoeren zodat endpoint-metadata beschikbaar is
+// voor middleware zoals rate limiting.
+app.UseRouting();
 
 // CORS — vóór authenticatie/autorisatie
 // UseCors onderschept ook OPTIONS-preflight-verzoeken vóór controllers ze verwerpen
 app.UseCors();
+
+// Rate limiting — na routing zodat endpoint-specifieke policies via
+// [EnableRateLimiting] betrouwbaar toegepast kunnen worden.
+app.UseRateLimiter();
 
 // Prometheus metrics endpoint — alleen bereikbaar op intern pad
 // In productie: beveilig met IP-allowlist of apart netwerk
