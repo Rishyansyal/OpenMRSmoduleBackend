@@ -231,23 +231,23 @@ builder.Services.AddMassTransit(x =>
 {
     x.AddConsumer<SendReminderConsumer>();
 
-if (!string.IsNullOrEmpty(rabbitMqHost))
-{
-    var rabbitMqUsername = builder.Configuration["RabbitMq:Username"];
-    var rabbitMqPassword = builder.Configuration["RabbitMq:Password"];
-    if (string.IsNullOrWhiteSpace(rabbitMqUsername) || string.IsNullOrWhiteSpace(rabbitMqPassword))
+    if (!string.IsNullOrEmpty(rabbitMqHost))
     {
-        throw new InvalidOperationException(
-            "RabbitMq:Username and RabbitMq:Password must be configured when RabbitMq:Host is set.");
-    }
-
-    x.UsingRabbitMq((ctx, cfg) =>
-    {
-        cfg.Host(rabbitMqHost, h =>
+        var rabbitMqUsername = builder.Configuration["RabbitMq:Username"];
+        var rabbitMqPassword = builder.Configuration["RabbitMq:Password"];
+        if (string.IsNullOrWhiteSpace(rabbitMqUsername) || string.IsNullOrWhiteSpace(rabbitMqPassword))
         {
-            h.Username(rabbitMqUsername);
-            h.Password(rabbitMqPassword);
-        });
+            throw new InvalidOperationException(
+                "RabbitMq:Username and RabbitMq:Password must be configured when RabbitMq:Host is set.");
+        }
+
+        x.UsingRabbitMq((ctx, cfg) =>
+        {
+            cfg.Host(rabbitMqHost, h =>
+            {
+                h.Username(rabbitMqUsername);
+                h.Password(rabbitMqPassword);
+            });
             cfg.UseMessageRetry(r => r.Exponential(3, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(5)));
             cfg.ConfigureEndpoints(ctx);
         });
@@ -331,7 +331,7 @@ builder.Services.Configure<CookiePolicyOptions>(opts =>
 {
     opts.MinimumSameSitePolicy = SameSiteMode.Strict;
     opts.HttpOnly              = Microsoft.AspNetCore.CookiePolicy.HttpOnlyPolicy.Always;
-    opts.Secure                = CookieSecurePolicy.SameAsRequest;
+    opts.Secure                = CookieSecurePolicy.Always;
 });
 
 // ============================================================================
