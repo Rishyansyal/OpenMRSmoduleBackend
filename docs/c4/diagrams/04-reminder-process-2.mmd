@@ -1,0 +1,13 @@
+sequenceDiagram
+    autonumber
+    actor Dev as Ontwikkelaar
+    participant API as RemindersController
+    participant W as ReminderWorker
+    participant B as MassTransit Bus
+
+    Dev->>API: POST /api/reminders/trigger (met JWT)
+    API->>W: ProcessAsync()
+    W->>B: Publish SendReminderCommand (per due scheduled reminder)
+    B-->>W: Gepubliceerd
+    W-->>API: Klaar
+    API-->>Dev: 200 OK { "message": "Reminder-run voltooid." }

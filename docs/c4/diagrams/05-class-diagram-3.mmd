@@ -1,0 +1,40 @@
+classDiagram
+    class IOpenMrsService {
+        <<interface>>
+        +SearchPatientsAsync(string query) Task~IEnumerable~PatientContact~~
+        +GetPatientAsync(string id) Task~PatientContact?~
+        +GetUpcomingAppointmentsAsync() Task~IEnumerable~UpcomingAppointment~~
+        +GetEncountersInRangeAsync(DateTime from, DateTime to) Task~IEnumerable~UpcomingAppointment~~
+    }
+
+    class OpenMrsService {
+        -OpenMrsOptions _options
+        +SearchPatientsAsync()
+        +GetPatientAsync()
+        +GetUpcomingAppointmentsAsync()
+        +GetEncountersInRangeAsync()
+        -CreateClient() HttpClient
+        -ParsePatient(JsonElement) PatientContact?
+        -ParseAppointment(JsonElement) UpcomingAppointment?
+    }
+
+    class PatientContact {
+        +string Id
+        +string DisplayName
+        +string? Phone
+        +string? Email
+    }
+
+    class UpcomingAppointment {
+        +string Id
+        +string Status
+        +DateTime Start
+        +DateTime? End
+        +string PatientId
+        +string PatientDisplay
+        +string? ServiceType
+    }
+
+    IOpenMrsService <|.. OpenMrsService
+    OpenMrsService ..> PatientContact : returns
+    OpenMrsService ..> UpcomingAppointment : returns

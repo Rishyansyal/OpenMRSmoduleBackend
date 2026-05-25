@@ -1,8 +1,3 @@
-# C4 Level 2 — Containers
-
-De technische bouwstenen van de OpenMRS Communicatiemodule.
-
-```mermaid
 flowchart TB
     classDef person fill:#08427b,stroke:#073b6f,color:#fff
     classDef container fill:#1168bd,stroke:#0b4884,color:#fff
@@ -29,4 +24,3 @@ flowchart TB
     openmrs -->|"Signed appointment webhook<br/>[HTTPS / :5111]"| api
     api -->|"FHIR R4 patiëntcontact<br/>[HTTPS / :3032]"| openmrs
     api -->|"Verstuurt berichten<br/>[REST + SOAP / HTTPS]"| providers
-```

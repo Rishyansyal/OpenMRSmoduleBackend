@@ -1,0 +1,31 @@
+classDiagram
+    class User {
+        +Guid Id
+        +string Email
+        +string PasswordHash
+        +DateTime CreatedAt
+    }
+
+    class MessageLog {
+        +Guid Id
+        +string Provider
+        +string MessageType
+        +int RecipientCount
+        +int FailedCount
+        +string? ProviderMessageId
+        +bool Success
+        +string? ErrorCode
+        +DateTime SentAt
+        +string SentByUserId
+    }
+
+    class ReminderLog {
+        +Guid Id
+        +string EncounterId
+        +string ReminderWindow
+        +string Provider
+        +bool Success
+        +string? ErrorCode
+        +DateTime EncounterStart
+        +DateTime SentAt
+    }

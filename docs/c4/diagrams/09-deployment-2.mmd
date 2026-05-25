@@ -1,0 +1,43 @@
+flowchart TB
+    classDef extuser fill:#fef3c7,stroke:#92400e,stroke-width:2px,color:#000
+    classDef edge fill:#dbeafe,stroke:#1e40af,stroke-width:2px,color:#000
+    classDef pod fill:#dcfce7,stroke:#166534,stroke-width:1px,color:#000
+    classDef db fill:#fce7f3,stroke:#9d174d,stroke-width:1px,color:#000
+    classDef ext fill:#e0e7ff,stroke:#4338ca,stroke-width:1px,color:#000
+
+    Zorg["👤 Zorgmedewerker<br/>(browser)"]:::extuser
+
+    subgraph DMZ["DMZ / Edge"]
+        LB["🛡️ Reverse proxy<br/>TLS 1.3 terminatie<br/>HSTS + HTTPS-redirect"]:::edge
+    end
+
+    subgraph App["Applicatie-tier"]
+        FEpod["📦 frontend (Next.js)<br/>:3001"]:::pod
+        APIpod["📦 api (ASP.NET Core)<br/>:8080"]:::pod
+        Bus["📦 RabbitMQ<br/>:5672"]:::pod
+    end
+
+    subgraph Data["Data-tier (privénetwerk)"]
+        PG[("🗄️ PostgreSQL 17<br/>:5432<br/>backups, AES-at-rest")]:::db
+    end
+
+    subgraph Obs["Observability"]
+        Prom["📊 Prometheus scrape<br/>/metrics"]:::pod
+    end
+
+    subgraph Ext["Externe systemen"]
+        OMRS["💻 OpenMRS EMR<br/>FHIR R4 + webhooks"]:::ext
+        Prov["💻 Messaging Providers<br/>SwiftSend / SecurePost / LegacyLink / AsyncFlow"]:::ext
+    end
+
+    Zorg -->|HTTPS :443| LB
+    LB -->|HTTP :3001| FEpod
+    LB -->|HTTP :8080| APIpod
+    OMRS -->|signed webhook :443| LB
+    FEpod -.->|server-side| APIpod
+    APIpod --> PG
+    APIpod --> Bus
+    Bus --> APIpod
+    APIpod --> OMRS
+    APIpod --> Prov
+    APIpod --> Prom
