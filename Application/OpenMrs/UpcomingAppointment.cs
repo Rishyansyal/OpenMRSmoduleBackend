@@ -7,4 +7,6 @@ public record UpcomingAppointment(
     DateTime? End,
     string PatientId,
     string PatientDisplay,
-    string? ServiceType);
+    string? ServiceType,
+    string? Location = null,
+    string? Instructions = null);
