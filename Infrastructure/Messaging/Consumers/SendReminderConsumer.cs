@@ -15,6 +15,7 @@ public class SendReminderConsumer(
     IMessagingService messagingService,
     IReminderLogRepository reminderLogRepository,
     IScheduledReminderRepository scheduledReminderRepository,
+    IMessageTemplateRepository messageTemplateRepository,
     MessagingMetrics metrics,
     ILogger<SendReminderConsumer> logger) : IConsumer<SendReminderCommand>
 {
@@ -56,7 +57,8 @@ public class SendReminderConsumer(
         }
 
         var type = patient.Phone is not null ? "SMS" : "EMAIL";
-        var content = BuildMessage(cmd);
+        var template = await messageTemplateRepository.GetByWindowAsync(cmd.ReminderWindow, ct);
+        var content = BuildMessage(cmd, template?.Body);
 
         var sw = Stopwatch.StartNew();
         var result = await messagingService.SendAsync(
@@ -96,15 +98,17 @@ public class SendReminderConsumer(
             $"Versturen mislukt voor encounter {cmd.EncounterId}: {result.Error}");
     }
 
-    private static string BuildMessage(SendReminderCommand cmd)
+    private static string BuildMessage(SendReminderCommand cmd, string? templateBody)
     {
         var timeStr = cmd.EncounterStart.ToLocalTime().ToString(
             "dddd d MMMM 'om' HH:mm",
             new System.Globalization.CultureInfo("nl-NL"));
-        var type = cmd.ServiceType ?? "afspraak";
+        var serviceType = cmd.ServiceType ?? "afspraak";
 
-        return cmd.ReminderWindow == "24h"
-            ? $"Herinnering: u heeft morgen een {type} op {timeStr}. Neem contact op bij vragen."
-            : $"Herinnering: u heeft over ongeveer 1 uur een {type} op {timeStr}.";
+        var body = templateBody ?? (cmd.ReminderWindow == "24h"
+            ? "Herinnering: u heeft morgen een {type} op {tijd}. Neem contact op bij vragen."
+            : "Herinnering: u heeft over ongeveer 1 uur een {type} op {tijd}.");
+
+        return body.Replace("{type}", serviceType).Replace("{tijd}", timeStr);
     }
 }

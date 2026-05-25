@@ -1,4 +1,5 @@
 using Application.Reminders;
+using Domain;
 using Infrastructure.Reminders;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -11,7 +12,8 @@ namespace Api.Controllers;
 public class RemindersController(
     ReminderWorker reminderWorker,
     IReminderLogRepository reminderLogRepository,
-    IScheduledReminderRepository scheduledReminderRepository) : ControllerBase
+    IScheduledReminderRepository scheduledReminderRepository,
+    IMessageTemplateRepository messageTemplateRepository) : ControllerBase
 {
     private const int MaxHistoryCount = 100;
 
@@ -26,7 +28,6 @@ public class RemindersController(
     [HttpGet("history")]
     public async Task<IActionResult> GetHistory([FromQuery] int count = 50, CancellationToken ct = default)
     {
-        // Begrens het aantal records om zware DB-queries te voorkomen (DoS-bescherming)
         count = Math.Clamp(count, 1, MaxHistoryCount);
         var logs = await reminderLogRepository.GetRecentAsync(count, ct);
         return Ok(logs);
@@ -38,5 +39,35 @@ public class RemindersController(
         var scheduled = await scheduledReminderRepository.GetRecentAsync(count, ct);
         return Ok(scheduled);
     }
+
+    [HttpGet("templates")]
+    public async Task<IActionResult> GetTemplates(CancellationToken ct)
+    {
+        var templates = await messageTemplateRepository.GetAllAsync(ct);
+        return Ok(templates);
+    }
+
+    [HttpPut("templates/{window}")]
+    public async Task<IActionResult> UpdateTemplate(
+        string window,
+        [FromBody] UpdateTemplateRequest request,
+        CancellationToken ct)
+    {
+        if (window != "24h" && window != "1h")
+            return BadRequest(new { error = "Ongeldig venster. Gebruik '24h' of '1h'." });
+
+        if (string.IsNullOrWhiteSpace(request.Body))
+            return BadRequest(new { error = "Berichttekst mag niet leeg zijn." });
+
+        await messageTemplateRepository.UpsertAsync(new MessageTemplate
+        {
+            Window = window,
+            Body = request.Body.Trim(),
+            UpdatedAtUtc = DateTime.UtcNow
+        }, ct);
+
+        return Ok(new { message = $"Sjabloon voor {window} bijgewerkt." });
+    }
 }
 
+public record UpdateTemplateRequest(string Body);
