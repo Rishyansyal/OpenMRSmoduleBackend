@@ -11,9 +11,9 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace OpenMRSmoduleBackend.Tests.Integration;
 
+[Collection(IntegrationCollection.Name)]
 public sealed class BackendIntegrationTests(
     BackendIntegrationTestFactory factory) :
-    IClassFixture<BackendIntegrationTestFactory>,
     IAsyncLifetime
 {
     public Task InitializeAsync() => factory.ResetDatabaseAsync();

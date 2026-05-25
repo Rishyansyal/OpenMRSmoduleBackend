@@ -79,8 +79,8 @@ builder.Services.AddRateLimiter(opts =>
     opts.OnRejected = async (ctx, ct) =>
     {
         var logger = ctx.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-        logger.LogWarning("Security Event: Rate limit exceeded by IP {IpAddress} on path {Path}", 
-            ctx.HttpContext.Connection.RemoteIpAddress, 
+        logger.LogWarning("Security Event: Rate limit exceeded by IP {IpAddress} on path {Path}",
+            ctx.HttpContext.Connection.RemoteIpAddress,
             ctx.HttpContext.Request.Path);
 
         ctx.HttpContext.Response.Headers["Retry-After"] = "60";
@@ -94,10 +94,10 @@ builder.Services.AddRateLimiter(opts =>
             partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             factory: _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit            = 5,
-                Window                 = TimeSpan.FromMinutes(1),
-                QueueProcessingOrder   = QueueProcessingOrder.OldestFirst,
-                QueueLimit             = 0
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
             }));
 
     // Gemiddelde policy voor formulieren/messaging: 10 verzoeken per minuut per IP
@@ -106,10 +106,10 @@ builder.Services.AddRateLimiter(opts =>
             partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             factory: _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit            = 10,
-                Window                 = TimeSpan.FromMinutes(1),
-                QueueProcessingOrder   = QueueProcessingOrder.OldestFirst,
-                QueueLimit             = 0
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
             }));
 
     // Algemene policy voor normale API calls: 100 verzoeken per minuut per IP
@@ -118,10 +118,10 @@ builder.Services.AddRateLimiter(opts =>
             partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             factory: _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit            = 100,
-                Window                 = TimeSpan.FromMinutes(1),
-                QueueProcessingOrder   = QueueProcessingOrder.OldestFirst,
-                QueueLimit             = 0
+                PermitLimit = 100,
+                Window = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
             }));
 });
 
@@ -150,16 +150,16 @@ builder.Services
     .AddIdentityCore<IdentityUser>(opts =>
     {
         // Aangescherpte wachtwoordeisen (NIST SP 800-63B)
-        opts.Password.RequireDigit           = true;
-        opts.Password.RequireLowercase       = true;
-        opts.Password.RequireUppercase       = false;  // NIST raadt af dit te verplichten
+        opts.Password.RequireDigit = true;
+        opts.Password.RequireLowercase = true;
+        opts.Password.RequireUppercase = false;  // NIST raadt af dit te verplichten
         opts.Password.RequireNonAlphanumeric = false;
-        opts.Password.RequiredLength         = 12;     // Verhoogd van 8 naar 12 tekens
+        opts.Password.RequiredLength = 12;     // Verhoogd van 8 naar 12 tekens
 
         // Account lockout na herhaalde foute pogingen
-        opts.Lockout.DefaultLockoutTimeSpan  = TimeSpan.FromMinutes(5);
+        opts.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
         opts.Lockout.MaxFailedAccessAttempts = 5;
-        opts.Lockout.AllowedForNewUsers      = true;
+        opts.Lockout.AllowedForNewUsers = true;
     })
     .AddEntityFrameworkStores<ApplicationDbContext>();
 
@@ -289,14 +289,14 @@ builder.Services
     {
         options.TokenValidationParameters = new TokenValidationParameters
         {
-            ValidateIssuer           = true,
-            ValidateAudience         = true,
-            ValidateLifetime         = true,
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            ValidIssuer              = builder.Configuration["Jwt:Issuer"],
-            ValidAudience            = builder.Configuration["Jwt:Audience"],
-            IssuerSigningKey         = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
-            ClockSkew                = TimeSpan.Zero  // Tokens verlopen op de exacte exp-time
+            ValidIssuer = builder.Configuration["Jwt:Issuer"],
+            ValidAudience = builder.Configuration["Jwt:Audience"],
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
+            ClockSkew = TimeSpan.Zero  // Tokens verlopen op de exacte exp-time
         };
     });
 
@@ -331,8 +331,8 @@ builder.Services.AddOpenApi();
 builder.Services.Configure<CookiePolicyOptions>(opts =>
 {
     opts.MinimumSameSitePolicy = SameSiteMode.Strict;
-    opts.HttpOnly              = Microsoft.AspNetCore.CookiePolicy.HttpOnlyPolicy.Always;
-    opts.Secure                = CookieSecurePolicy.Always;
+    opts.HttpOnly = Microsoft.AspNetCore.CookiePolicy.HttpOnlyPolicy.Always;
+    opts.Secure = CookieSecurePolicy.Always;
 });
 
 // ============================================================================
@@ -403,7 +403,12 @@ app.UseCors();
 
 // Rate limiting — na routing zodat endpoint-specifieke policies via
 // [EnableRateLimiting] betrouwbaar toegepast kunnen worden.
-app.UseRateLimiter();
+// In de IntegrationTest-omgeving uitgeschakeld omdat WebApplicationFactory alle requests
+// vanaf loopback stuurt en de limiter dan tests blokkeert die meerdere users registreren.
+if (!app.Environment.IsEnvironment("IntegrationTest"))
+{
+    app.UseRateLimiter();
+}
 
 // Prometheus metrics endpoint — alleen bereikbaar op intern pad
 // In productie: beveilig met IP-allowlist of apart netwerk
