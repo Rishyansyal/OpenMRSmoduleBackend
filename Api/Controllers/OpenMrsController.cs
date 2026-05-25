@@ -14,6 +14,9 @@ public class OpenMrsController(IOpenMrsService openMrsService) : ControllerBase
     {
         if (string.IsNullOrWhiteSpace(q))
             return BadRequest(new { error = "Zoekterm 'q' is verplicht" });
+            
+        if (q.Length > 100)
+            return BadRequest(new { error = "Zoekterm 'q' mag maximaal 100 tekens lang zijn." });
 
         var patients = await openMrsService.SearchPatientsAsync(q, ct);
         return Ok(patients);
