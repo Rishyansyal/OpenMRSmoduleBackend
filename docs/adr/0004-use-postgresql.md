@@ -18,6 +18,16 @@ We gebruiken **PostgreSQL 17** voor zowel lokaal (Docker) als productie.
 - Driver: `Npgsql` voor Dapper.
 - Lokaal: via `docker-compose` service `db` met een named volume `pgdata`.
 
+## Overwogen alternatieven
+
+| Alternatief | Reden van afval |
+|---|---|
+| **SQL Server** | Licentiekosten in productie; sterk Windows-leaning; minder neutrale keuze voor SaaS dat overal moet kunnen draaien. |
+| **MySQL / MariaDB** | Werkt, maar minder rijke feature-set (zwakkere JSONB, geen `RETURNING`-clausule in oudere versies, beperkter window-functions). Voor de queries die we doen geen meerwaarde. |
+| **SQLite** | Geen concurrent writes onder load; geen geschikte productie-DB voor een SaaS met meerdere API-instanties. We gebruiken het wel als test-DB voor integratietests ([ADR-0013](0013-pragmatic-automated-test-strategy.md)). |
+| **MongoDB / NoSQL** | Onze data is sterk relationeel (FK's tussen `appointment_notifications` ↔ `scheduled_reminders`, transacties bij webhook-verwerking). NoSQL kost ACID en wint niets. |
+| **CockroachDB / YugabyteDB** | Horizontaal-schaalbare relationals, maar overkill voor onze schaal en met operationele complexiteit die we niet aankunnen. |
+
 ## Consequences
 
 - Open source, geen licentiekosten, brede hosting-opties (managed bij elke major cloud).

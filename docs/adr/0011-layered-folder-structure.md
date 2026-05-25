@@ -32,6 +32,15 @@ Infrastructure/  # implementaties: Dapper repos, EF DbContext, Identity, externe
 
 **Namespaces** volgen de mapnaam zonder project-prefix (`Api.Controllers`, `Infrastructure.Persistence`, etc.). Zie [ADR 0012](0012-namespace-convention.md) als die er is.
 
+## Overwogen alternatieven
+
+| Alternatief | Reden van afval |
+|---|---|
+| **Clean Architecture met aparte `.csproj`'s per laag** | Dwingt dependency-richting af via compiler; ideaal voor grote codebases. Voor onze huidige omvang puur overhead: vier projecten om te restoreen, te builden en te referencen waar één voldoet. Path naar splitsing blijft open — alleen project references toevoegen. |
+| **Vertical Slice Architecture** | Eén map per use case (`SendMessage/`, `RegisterUser/`, …). Sterk voor teams die parallel aan features werken; voor ons kleine team verspreidt het juist gerelateerde code. We hergebruiken `Infrastructure` veel — een verticale slice zou veel duplicatie geven. |
+| **Modular Monolith (één project per module + intern layered)** | Tussenoplossing tussen Clean Architecture en wat wij doen. Te zwaar voor de huidige scope; potentieel waardevol als de module uitbreidt naar meerdere bounded contexts. |
+| **Flat / Controllers + Data folders zonder lagen** | Werkt voor één controller; bij groei eindigt business logic in controllers en queries verspreid over de codebase. Precies wat we willen voorkomen. |
+
 ## Consequences
 
 - Lagen zijn zichtbaar in de mappenboom; reviewers kunnen makkelijk zien of een controller direct in `Infrastructure` reikt (smell) of via `Application` (ok).

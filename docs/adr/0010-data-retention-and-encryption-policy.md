@@ -39,6 +39,17 @@ We implement a three-tier data retention and encryption policy:
 - Logs containing sensitive data are themselves encrypted or redacted.
 - After 12 months: delete logs via annual cleanup service.
 
+## Considered alternatives
+
+| Alternative | Why rejected |
+|---|---|
+| **Retain everything forever** | Violates GDPR Article 5 (data minimization); increases breach blast radius; legal liability grows unboundedly. |
+| **Soft delete only (`deleted_at` flag)** | PII remains in the database, just hidden — still recoverable by anyone with DB access. Does not actually reduce risk. |
+| **Archive to cold storage (S3 Glacier / tape) after 14 days** | Adds operational complexity (extra storage tier, restore procedure, encryption-key management twice); not required for our use case where post-14-day patient data has no operational value. |
+| **Single retention period for everything (e.g., 30 days)** | Either deletes audit logs too soon (compliance gap for invoice/dispute resolution, 365 days needed) or keeps patient data too long. Three tiers match the actual purposes. |
+| **No application-level encryption, rely on PostgreSQL TDE only** | Protects against stolen disks but not against an attacker with SQL access (insider, leaked credentials). App-level AES-GCM defends against both ([ADR-0015](0015-encryption-and-webhook-security-posture.md)). |
+| **Full pseudonymization instead of deletion at 14 days** | Re-identification risk via metadata (date + provider + duration narrows down to a few patients). Outright deletion is safer and simpler. |
+
 ## Consequences
 
 **Advantages:**

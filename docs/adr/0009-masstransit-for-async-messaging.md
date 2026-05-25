@@ -25,6 +25,18 @@ We use **MassTransit** as our message bus and service orchestration layer.
 - Transport: RabbitMQ (production) or in-memory (local dev, see [ADR 0005](0005-use-docker-for-deployment.md) for Docker setup).
 - Hosted services and scheduled jobs push messages; consumers pull and execute.
 
+## Considered alternatives
+
+| Alternative | Why rejected |
+|---|---|
+| **NServiceBus** | Mature and battle-tested, but commercial license; cost model unfit for an academic project. MassTransit offers similar features under Apache 2.0. |
+| **Rebus** | OSS service bus, but smaller community and ecosystem than MassTransit; less .NET-10-ready tooling. |
+| **Raw `RabbitMQ.Client` (no service bus)** | Forces us to write our own retry, dead-letter, correlation, serialization, idempotency wrappers. That's the value MassTransit provides. |
+| **Hangfire** | Excellent for scheduled background jobs, but couples scheduling and execution. We want scheduling in `scheduled_reminders` (DB as source of truth) and only *dispatch* via the bus. Hangfire would introduce a second job-state store. |
+| **Quartz.NET** | Same scheduling-and-execution coupling as Hangfire; older API style. |
+| **Plain `IHostedService` with in-process work queue** | No retry/DLQ semantics; no horizontal scaling; one crash loses in-flight work. Discussed in detail in [ADR-0017](0017-async-messaging-as-separate-component.md). |
+| **Cloud-only: Azure Service Bus / AWS SQS as the only transport** | Vendor lock-in and unusable in offline dev. MassTransit's pluggable transport lets us start with RabbitMQ and switch later without code changes. |
+
 ## Consequences
 
 **Advantages:**

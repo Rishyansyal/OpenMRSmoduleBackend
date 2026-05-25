@@ -16,6 +16,16 @@ We leveren een **multi-stage [Dockerfile](../../Dockerfile)** (sdk → publish �
 
 Configuratie via environment variables, geladen uit een lokale `.env` (zie [ADR 0006](0006-secrets-via-env-file.md)). De app leest `ConnectionStrings__DefaultConnection` uit de env, zodat dezelfde image lokaal én in productie werkt.
 
+## Overwogen alternatieven
+
+| Alternatief | Reden van afval |
+|---|---|
+| **Bare-metal install (Postgres + .NET SDK lokaal)** | "Works on my machine"-risico; versie-drift tussen developers; tijdrovende onboarding voor nieuwe teamleden. |
+| **Vagrant + VirtualBox** | Veel zwaarder dan Docker (volledige VM), niet meer mainstream voor .NET-projecten. |
+| **VS Code devcontainers** | Bouwt zelf op Docker, geeft alleen een editor-laag erbovenop. We krijgen geen extra reproduceerbaarheid t.o.v. plain Docker Compose; wel een editor-lock-in. |
+| **Nix / NixOS** | Reproduceerbaarder dan Docker, maar steile leercurve en geen team-ervaring. |
+| **Cloud dev environments (GitHub Codespaces, Gitpod)** | Vereist account + kosten; overbodig nu lokale Docker volstaat. |
+
 ## Consequences
 
 - Iedereen runt `docker compose up` en heeft een werkende stack — geen aparte Postgres-install nodig.

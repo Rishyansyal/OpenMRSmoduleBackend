@@ -18,6 +18,15 @@ We gebruiken **Dapper** voor onze domein-queries. EF Core wordt enkel gebruikt v
 
 Connection-management gaat via een eigen `IDbConnectionFactory` zodat tests een fake connection kunnen injecteren en controllers geen connection strings kennen.
 
+## Overwogen alternatieven
+
+| Alternatief | Reden van afval |
+|---|---|
+| **EF Core voor álle queries** | Lazy loading-risico's (N+1), change-tracker-overhead op write-heavy paden, verborgen SQL. Voor domein-queries waar we precies willen weten wat er over de wire gaat is dat te veel magie. |
+| **Raw `ADO.NET` met `NpgsqlCommand`** | Geen mapping-helper; boilerplate-explosie. Dapper geeft de explicietheid van ADO.NET met 80% minder code. |
+| **Andere micro-ORM (Massive, PetaPoco, RepoDB)** | Kleinere community en minder up-to-date met .NET 10 dan Dapper. Geen functionele winst. |
+| **NHibernate** | Zwaargewicht; legacy reputatie; niet meer mainstream in .NET. |
+
 ## Consequences
 
 - Queries zijn expliciet (raw SQL of parameterized) — geen verborgen N+1's door lazy loading.
