@@ -12,3 +12,6 @@ docs/
 Dockerfile
 docker-compose*.yml
 *.md
+# Security: development-settings kunnen credentials bevatten, niet in productie-image
+appsettings.Development.json
+

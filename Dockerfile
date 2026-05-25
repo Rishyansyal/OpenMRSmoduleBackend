@@ -9,6 +9,10 @@ RUN dotnet publish OpenMRSmoduleBackend.csproj -c Release -o /app /p:UseAppHost=
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
+
+# Security: de .NET base image heeft al een non-root 'app' user (UID 1654)
+USER app
+
 COPY --from=build /app ./
 
 ENV ASPNETCORE_URLS=http://+:8080
@@ -16,3 +20,4 @@ EXPOSE 8080
 
 USER $APP_UID
 ENTRYPOINT ["dotnet", "OpenMRSmoduleBackend.dll"]
+
