@@ -384,6 +384,17 @@ else
     app.UseHttpsRedirection();
 }
 
+// Global Exception Handler om leaking van stacktraces te voorkomen
+app.UseExceptionHandler(errorApp =>
+{
+    errorApp.Run(async context =>
+    {
+        context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+        context.Response.ContentType = "application/json";
+        await context.Response.WriteAsJsonAsync(new { error = "Internal Server Error" });
+    });
+});
+
 // Security headers (X-Frame-Options, CSP, etc.) — zo vroeg mogelijk in de pipeline
 app.UseMiddleware<SecurityHeadersMiddleware>();
 
