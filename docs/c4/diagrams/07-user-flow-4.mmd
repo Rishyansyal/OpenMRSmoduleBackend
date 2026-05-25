@@ -1,0 +1,18 @@
+flowchart TD
+    classDef start fill:#dcfce7,stroke:#166534,stroke-width:2px,color:#000
+    classDef action fill:#dbeafe,stroke:#1e40af,stroke-width:1px,color:#000
+    classDef decision fill:#fef3c7,stroke:#92400e,stroke-width:1px,color:#000
+    classDef done fill:#e0e7ff,stroke:#4338ca,stroke-width:2px,color:#000
+
+    Start([Klik 'Geschiedenis' op dashboard]):::start
+    Load["GET /api/messages/history"]:::action
+    Render["Tabel: provider, type, success, sent_at, recipient_count"]:::action
+    Async{Async bericht<br/>met trackingId?}:::decision
+    Poll["GET /api/messages/status/{trackingId}"]:::action
+    UpdateStatus(["Status bijwerken in UI"]):::done
+    Done(["Lijst getoond"]):::done
+
+    Start --> Load --> Render
+    Render --> Async
+    Async -->|ja| Poll --> UpdateStatus
+    Async -->|nee| Done

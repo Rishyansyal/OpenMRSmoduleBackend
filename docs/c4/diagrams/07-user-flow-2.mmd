@@ -1,0 +1,25 @@
+flowchart TD
+    classDef start fill:#dcfce7,stroke:#166534,stroke-width:2px,color:#000
+    classDef action fill:#dbeafe,stroke:#1e40af,stroke-width:1px,color:#000
+    classDef decision fill:#fef3c7,stroke:#92400e,stroke-width:1px,color:#000
+    classDef error fill:#fee2e2,stroke:#991b1b,stroke-width:1px,color:#000
+    classDef done fill:#e0e7ff,stroke:#4338ca,stroke-width:2px,color:#000
+
+    Start([Klik 'Berichten' op dashboard]):::start
+    LoadProv["GET /api/messages/providers"]:::action
+    SelectProv["Selecteer provider<br/>(SwiftSend / SecurePost / LegacyLink / AsyncFlow)"]:::action
+    FillForm["Vul ontvangers, type (SMS/email/push) en bericht in"]:::action
+    Send["POST /api/messages"]:::action
+    Rate{"Rate limit<br/>(10/min)?"}:::decision
+    Provider{"Provider call<br/>succesvol?"}:::decision
+    Log["Message-log opgeslagen<br/>(provider, type, success, recipient_count)"]:::action
+    Result(["Toon resultaat in UI"]):::done
+    Err429(["⚠️ 429 — wacht 1 min"]):::error
+    ErrProv(["❌ Foutmelding tonen"]):::error
+
+    Start --> LoadProv --> SelectProv --> FillForm --> Send
+    Send --> Rate
+    Rate -->|nee, limit hit| Err429
+    Rate -->|ja| Provider
+    Provider -->|ja| Log --> Result
+    Provider -->|nee| ErrProv

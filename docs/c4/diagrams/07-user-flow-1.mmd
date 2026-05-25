@@ -1,0 +1,26 @@
+flowchart TD
+    classDef start fill:#dcfce7,stroke:#166534,stroke-width:2px,color:#000
+    classDef page fill:#dbeafe,stroke:#1e40af,stroke-width:1px,color:#000
+    classDef decision fill:#fef3c7,stroke:#92400e,stroke-width:1px,color:#000
+    classDef done fill:#e0e7ff,stroke:#4338ca,stroke-width:2px,color:#000
+
+    Start([Open applicatie]):::start
+    Login["/login pagina"]:::page
+    AuthCheck{JWT geldig?}:::decision
+    Dashboard["/dashboard — overzicht"]:::page
+
+    Berichten["/dashboard/berichten"]:::page
+    Geschiedenis["/dashboard/geschiedenis"]:::page
+    Patienten["/dashboard/patienten"]:::page
+
+    Start --> AuthCheck
+    AuthCheck -->|nee| Login
+    AuthCheck -->|ja| Dashboard
+    Login -->|login/register ok| Dashboard
+    Dashboard --> Berichten
+    Dashboard --> Geschiedenis
+    Dashboard --> Patienten
+    Berichten -->|terug| Dashboard
+    Geschiedenis -->|terug| Dashboard
+    Patienten -->|terug| Dashboard
+    Dashboard -->|logout| Login
