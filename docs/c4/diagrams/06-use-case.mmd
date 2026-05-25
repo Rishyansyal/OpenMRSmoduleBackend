@@ -1,0 +1,45 @@
+graph LR
+    classDef actor fill:#fef3c7,stroke:#92400e,stroke-width:2px,color:#000
+    classDef usecase fill:#dbeafe,stroke:#1e40af,stroke-width:1px,color:#000
+    classDef system fill:#e0e7ff,stroke:#4338ca,stroke-width:2px,color:#000
+
+    Zorg(["👤 Zorgmedewerker"]):::actor
+    Pat(["👤 Patiënt"]):::actor
+    Dev(["👤 Ontwikkelaar / Beheerder"]):::actor
+    OM(["💻 OpenMRS EMR"]):::actor
+    MP(["💻 Messaging Provider"]):::actor
+
+    subgraph SYS["OpenMRS Communicatiemodule"]
+        UC1(["Registreren / inloggen"]):::usecase
+        UC2(["Bericht versturen via provider"]):::usecase
+        UC3(["Berichtenhistorie bekijken"]):::usecase
+        UC4(["Patiënt zoeken"]):::usecase
+        UC5(["Patiëntdetails inzien"]):::usecase
+        UC6(["Aankomende afspraken bekijken"]):::usecase
+        UC7(["Async-bericht status opvragen"]):::usecase
+        UC8(["Automatisch afspraakherinnering ontvangen"]):::usecase
+        UC9(["Appointment-event ontvangen"]):::usecase
+        UC10(["Handmatig herinnering triggeren"]):::usecase
+        UC11(["Data-retentie handmatig draaien"]):::usecase
+        UC12(["Berichten bezorgen aan ontvanger"]):::usecase
+    end
+
+    Zorg --> UC1
+    Zorg --> UC2
+    Zorg --> UC3
+    Zorg --> UC4
+    Zorg --> UC5
+    Zorg --> UC6
+    Zorg --> UC7
+
+    Pat --> UC8
+
+    Dev --> UC10
+    Dev --> UC11
+
+    OM --> UC9
+    UC9 -.->|triggert| UC8
+
+    MP --> UC12
+    UC2 -.->|delegeert aan| MP
+    UC8 -.->|verstuurd via| MP

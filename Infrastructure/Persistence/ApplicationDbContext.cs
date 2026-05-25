@@ -14,6 +14,7 @@ public class ApplicationDbContext(
 {
     public DbSet<AppointmentNotification> AppointmentNotifications => Set<AppointmentNotification>();
     public DbSet<MessageLog> MessageLogs => Set<MessageLog>();
+    public DbSet<MessageTemplate> MessageTemplates => Set<MessageTemplate>();
     public DbSet<OrganizationIntegrationConfig> OrganizationIntegrationConfigs => Set<OrganizationIntegrationConfig>();
     public DbSet<ReminderLog> ReminderLogs => Set<ReminderLog>();
     public DbSet<ScheduledReminder> ScheduledReminders => Set<ScheduledReminder>();
@@ -149,6 +150,15 @@ public class ApplicationDbContext(
             e.Property(m => m.SentAt).HasColumnName("sent_at");
             e.Property(m => m.SentByUserId).HasColumnName("sent_by_user_id").IsRequired();
             e.HasIndex(m => m.SentAt);
+        });
+
+        builder.Entity<MessageTemplate>(e =>
+        {
+            e.ToTable("message_templates");
+            e.HasKey(t => t.Window);
+            e.Property(t => t.Window).HasColumnName("window").IsRequired();
+            e.Property(t => t.Body).HasColumnName("body").IsRequired();
+            e.Property(t => t.UpdatedAtUtc).HasColumnName("updated_at_utc");
         });
     }
 }

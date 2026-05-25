@@ -1,8 +1,3 @@
-# C4 Level 1 — System Context
-
-Wie gebruikt het systeem en met welke externe systemen communiceert het?
-
-```mermaid
 flowchart LR
     classDef person fill:#08427b,stroke:#073b6f,color:#fff
     classDef system fill:#1168bd,stroke:#0b4884,color:#fff
@@ -28,4 +23,3 @@ flowchart LR
     module -->|"Haalt patiëntcontact op<br/>[FHIR R4 / HTTPS]"| openmrs
     module -->|"Verstuurt berichten<br/>[REST + SOAP / HTTPS]"| providers
     providers -.->|"SMS / e-mail / push"| patient
-```

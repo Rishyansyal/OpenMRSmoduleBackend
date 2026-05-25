@@ -1,0 +1,23 @@
+flowchart TD
+    classDef start fill:#dcfce7,stroke:#166534,stroke-width:2px,color:#000
+    classDef action fill:#dbeafe,stroke:#1e40af,stroke-width:1px,color:#000
+    classDef decision fill:#fef3c7,stroke:#92400e,stroke-width:1px,color:#000
+    classDef done fill:#e0e7ff,stroke:#4338ca,stroke-width:2px,color:#000
+
+    Start([Klik 'Patiënten' op dashboard]):::start
+    Input["Typ zoekterm (naam)"]:::action
+    Search["GET /api/openmrs/patients?q=..."]:::action
+    Fhir["Backend → OpenMRS FHIR R4"]:::action
+    List["Toon lijst met patiënten<br/>(naam, telefoon, email)"]:::action
+    Detail{Klik op<br/>patiënt?}:::decision
+    Get["GET /api/openmrs/patients/{id}"]:::action
+    Show(["Toon contactgegevens"]):::done
+    Appoint{Klik op<br/>'Afspraken'?}:::decision
+    GetApp["GET /api/openmrs/appointments"]:::action
+    ShowApp(["Toon aankomende afspraken"]):::done
+
+    Start --> Input --> Search --> Fhir --> List
+    List --> Detail
+    Detail -->|ja| Get --> Show
+    Show --> Appoint
+    Appoint -->|ja| GetApp --> ShowApp

@@ -276,6 +276,7 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<DataRetentionWorke
 builder.Services.Configure<ReminderOptions>(builder.Configuration.GetSection("Reminders"));
 builder.Services.AddScoped<IReminderLogRepository, ReminderLogRepository>();
 builder.Services.AddScoped<IScheduledReminderRepository, ScheduledReminderRepository>();
+builder.Services.AddScoped<IMessageTemplateRepository, MessageTemplateRepository>();
 builder.Services.AddSingleton<ReminderWorker>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<ReminderWorker>());
 
@@ -345,6 +346,25 @@ if (app.Configuration.GetValue("Database:RunMigrations", true))
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     await db.Database.MigrateAsync();
+
+    // Seed standaard berichtsjablonen als de tabel leeg is
+    if (!db.MessageTemplates.Any())
+    {
+        db.MessageTemplates.AddRange(
+            new Domain.MessageTemplate
+            {
+                Window = "24h",
+                Body = "Herinnering: u heeft morgen een {type} op {tijd}. Neem contact op bij vragen.",
+                UpdatedAtUtc = DateTime.UtcNow
+            },
+            new Domain.MessageTemplate
+            {
+                Window = "1h",
+                Body = "Herinnering: u heeft over ongeveer 1 uur een {type} op {tijd}.",
+                UpdatedAtUtc = DateTime.UtcNow
+            });
+        await db.SaveChangesAsync();
+    }
 }
 
 if (app.Environment.IsDevelopment())
