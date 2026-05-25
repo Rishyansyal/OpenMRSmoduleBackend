@@ -21,6 +21,16 @@ We gebruiken een pragmatische testpiramide:
 
 Full OpenMRS containervalidatie blijft een lokale of handmatige acceptatietest.
 
+## Overwogen alternatieven
+
+| Alternatief | Reden van afval |
+|---|---|
+| **Volledige integratiesuite (echte OpenMRS-container) op elke PR** | Onbetrouwbaar (flaky), traag (5–10 min opstart) en verspilling van CI-tijd voor wijzigingen die OpenMRS niet raken. Acceptatie blijft handmatig of in een nightly-build. |
+| **Alleen unit tests, geen integratietests** | Mist het type bug dat juist *tussen* lagen ontstaat (DI-misregistratie, middleware-volgorde, EF-mappings). De `WebApplicationFactory` + SQLite-aanpak in [testing.md](../testing.md) dekt dat goedkoop. |
+| **BDD met SpecFlow / Reqnroll** | Krachtig voor business-owned scenarios, maar voor ons team-grootte introduceert het een tweede taal (Gherkin) en een onderhoudslast. xUnit met duidelijke testnamen volstaat. |
+| **Contract testing (Pact) tussen backend en frontend** | Waardevol voor losgekoppelde teams; voor ons team waar dezelfde mensen beide kanten aanraken te veel overhead. Frontend Vitest-tests checken de API-client al. |
+| **Manual QA only** | Niet schaalbaar; regressies worden te laat ontdekt; voldoet niet aan het rubric. |
+
 ## Consequences
 
 - CI blijft snel genoeg voor PR's.

@@ -68,6 +68,98 @@ public class OpenMrsService(IHttpClientFactory httpClientFactory, IOptions<OpenM
         return ParseAppointmentBundle(doc.RootElement).ToList();
     }
 
+    public async Task<UpcomingAppointment> CreateVisitAsync(CreateVisitRequest request, CancellationToken ct = default)
+    {
+        var client = CreateClient();
+
+        var startStr = request.StartUtc.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.000+0000");
+        var visit = new Dictionary<string, object?>
+        {
+            ["patient"] = request.PatientId,
+            ["visitType"] = request.VisitTypeId,
+            ["startDatetime"] = startStr
+        };
+        if (!string.IsNullOrWhiteSpace(request.LocationId))
+            visit["location"] = request.LocationId;
+        if (request.EndUtc.HasValue)
+            visit["stopDatetime"] = request.EndUtc.Value.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.000+0000");
+
+        var json = JsonSerializer.Serialize(visit);
+        var url = $"{_options.BaseUrl.TrimEnd('/')}/openmrs/ws/rest/v1/visit";
+        using var content = new StringContent(json, Encoding.UTF8, "application/json");
+        var response = await client.PostAsync(url, content, ct);
+        var body = await response.Content.ReadAsStringAsync(ct);
+
+        if (!response.IsSuccessStatusCode)
+            throw new InvalidOperationException(
+                $"OpenMRS POST /visit faalde ({(int)response.StatusCode}): {body}");
+
+        using var doc = JsonDocument.Parse(body);
+        var root = doc.RootElement;
+        var visitId = root.GetProperty("uuid").GetString() ?? "";
+
+        // FHIR2 mapping is meestal direct beschikbaar; haal Encounter op om
+        // de canonieke representatie (status, service-type, location-display) terug te krijgen.
+        var fetched = await GetEncounterAsync(visitId, ct);
+        if (fetched is null)
+        {
+            return new UpcomingAppointment(
+                visitId,
+                "planned",
+                request.StartUtc,
+                request.EndUtc,
+                request.PatientId,
+                "",
+                request.ServiceTypeOverride,
+                request.LocationOverride,
+                request.Instructions);
+        }
+
+        return fetched with
+        {
+            ServiceType = request.ServiceTypeOverride ?? fetched.ServiceType,
+            Location = request.LocationOverride ?? fetched.Location,
+            Instructions = request.Instructions
+        };
+    }
+
+    private async Task<UpcomingAppointment?> GetEncounterAsync(string id, CancellationToken ct)
+    {
+        var client = CreateClient();
+        var response = await client.GetAsync($"{_options.FhirBase}/Encounter/{id}", ct);
+        if (!response.IsSuccessStatusCode) return null;
+
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
+        return ParseAppointment(doc.RootElement);
+    }
+
+    public async Task<IEnumerable<OpenMrsReferenceItem>> GetVisitTypesAsync(CancellationToken ct = default) =>
+        await GetReferenceListAsync("visittype", ct);
+
+    public async Task<IEnumerable<OpenMrsReferenceItem>> GetLocationsAsync(CancellationToken ct = default) =>
+        await GetReferenceListAsync("location", ct);
+
+    private async Task<IEnumerable<OpenMrsReferenceItem>> GetReferenceListAsync(string resource, CancellationToken ct)
+    {
+        var client = CreateClient();
+        var url = $"{_options.BaseUrl.TrimEnd('/')}/openmrs/ws/rest/v1/{resource}?v=default";
+        var response = await client.GetAsync(url, ct);
+        response.EnsureSuccessStatusCode();
+
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
+        if (!doc.RootElement.TryGetProperty("results", out var results)) return [];
+
+        var items = new List<OpenMrsReferenceItem>();
+        foreach (var r in results.EnumerateArray())
+        {
+            var uuid = r.TryGetProperty("uuid", out var u) ? u.GetString() : null;
+            var display = r.TryGetProperty("display", out var d) ? d.GetString() : null;
+            if (!string.IsNullOrEmpty(uuid) && !string.IsNullOrEmpty(display))
+                items.Add(new OpenMrsReferenceItem(uuid, display));
+        }
+        return items;
+    }
+
     // --- FHIR parsers ---
 
     private static IEnumerable<PatientContact> ParsePatientBundle(JsonElement bundle)
@@ -109,6 +201,12 @@ public class OpenMrsService(IHttpClientFactory httpClientFactory, IOptions<OpenM
             {
                 var system = t.TryGetProperty("system", out var s) ? s.GetString() : null;
                 var value = t.TryGetProperty("value", out var v) ? v.GetString() : null;
+                if (string.IsNullOrWhiteSpace(value)) continue;
+
+                // OpenMRS FHIR2 retourneert telecom soms zonder system — heuristisch raden.
+                if (string.IsNullOrEmpty(system))
+                    system = value.Contains('@') ? "email" : "phone";
+
                 if (system == "phone" && phone is null) phone = value;
                 if (system == "email" && email is null) email = value;
             }
@@ -168,6 +266,20 @@ public class OpenMrsService(IHttpClientFactory httpClientFactory, IOptions<OpenM
                 serviceType = coding[0].TryGetProperty("display", out var cd) ? cd.GetString() : null;
         }
 
-        return new UpcomingAppointment(id, status, start, end, patientId, patientDisplay, serviceType);
+        // Encounter.location[0].location.display
+        string? location = null;
+        if (resource.TryGetProperty("location", out var locations) && locations.GetArrayLength() > 0)
+        {
+            var first = locations[0];
+            if (first.TryGetProperty("location", out var loc))
+            {
+                if (loc.TryGetProperty("display", out var disp))
+                    location = disp.GetString();
+                else if (loc.TryGetProperty("reference", out var reff))
+                    location = reff.GetString();
+            }
+        }
+
+        return new UpcomingAppointment(id, status, start, end, patientId, patientDisplay, serviceType, location);
     }
 }

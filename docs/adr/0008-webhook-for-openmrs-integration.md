@@ -21,6 +21,16 @@ We use **webhooks** for all OpenMRS → backend communication.
 - Our webhook controller receives and validates the payload, then passes it to the service layer for encryption and storage.
 - No continuous polling; data flows as events occur.
 
+## Considered alternatives
+
+| Alternative | Why rejected |
+|---|---|
+| **Polling the OpenMRS REST/FHIR API** | High load on both sides (we keep asking, OpenMRS keeps answering); latency between event and reminder; complex bookkeeping for "what did we already see?" Wastes resources on idle periods. |
+| **Server-Sent Events (SSE) from OpenMRS** | Long-lived HTTP connection; not natively supported by OpenMRS modules; brittle through corporate firewalls and reverse proxies. |
+| **Shared message queue (OpenMRS publishes to RabbitMQ / Kafka, we consume)** | Adds operational complexity for OpenMRS deployers and us. Webhooks are simpler and OpenMRS-friendly; we already have a message bus internally ([ADR-0009](0009-masstransit-for-async-messaging.md)) for our own async work. |
+| **Database-level integration (read OpenMRS DB directly)** | Tight coupling to OpenMRS schema; security nightmare; explicitly discouraged by OpenMRS. |
+| **File drop / scheduled export** | Not real-time; reminders would be late or miss same-day appointments. |
+
 ## Consequences
 
 **Advantages:**

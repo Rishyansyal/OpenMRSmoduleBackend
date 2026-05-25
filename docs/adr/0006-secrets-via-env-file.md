@@ -18,6 +18,16 @@ Acceptatiecriterium: **geen hardcoded credentials**. We hebben minstens DB-crede
 - `docker-compose.yml` leest `.env` automatisch en injecteert de waarden als environment variables in de container.
 - `appsettings.json` bevat geen credentials; `ConnectionStrings:DefaultConnection` is leeg en wordt overschreven door de env var `ConnectionStrings__DefaultConnection`.
 
+## Overwogen alternatieven
+
+| Alternatief | Reden van afval |
+|---|---|
+| **Credentials in `appsettings.json`** | Belandt in git history; precies wat het acceptatiecriterium "geen hardcoded credentials" verbiedt. |
+| **`dotnet user-secrets`** | Werkt alleen tijdens `dotnet run` op de host; geen integratie met Docker Compose dat de container start. Voor onze Docker-baseline ([ADR-0005](0005-use-docker-for-deployment.md)) niet werkbaar. |
+| **Encrypted secrets in repo (git-crypt / SOPS / age)** | Geeft committen aan git mogelijk, maar voegt key-management toe (wie heeft de decryption key?) — voor dev-credentials niet de moeite waard. |
+| **Azure Key Vault / AWS Secrets Manager voor lokale dev** | Cloud-afhankelijkheid voor lokaal werk; vereist accounts en kostenmodel. Geadviseerd voor productie (zie consequences) maar niet voor dev. |
+| **HashiCorp Vault zelf hosten** | Operationeel zwaar; overkill voor projectschaal. |
+
 ## Consequences
 
 - Geen credential leaks in git history.

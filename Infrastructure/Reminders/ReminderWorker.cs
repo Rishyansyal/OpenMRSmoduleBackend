@@ -60,7 +60,9 @@ public class ReminderWorker(
                 reminder.ReminderWindow,
                 reminder.EncounterStart,
                 reminder.ServiceType,
-                reminder.Provider), ct);
+                reminder.Provider,
+                reminder.Location,
+                reminder.Instructions), ct);
 
             published++;
             logger.LogDebug("SendReminderCommand gepubliceerd: encounter {id}, venster {window}.",

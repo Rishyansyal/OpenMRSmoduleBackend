@@ -104,11 +104,19 @@ public class SendReminderConsumer(
             "dddd d MMMM 'om' HH:mm",
             new System.Globalization.CultureInfo("nl-NL"));
         var serviceType = cmd.ServiceType ?? "afspraak";
+        var location = string.IsNullOrWhiteSpace(cmd.Location) ? "locatie onbekend" : cmd.Location!;
+        var instructions = string.IsNullOrWhiteSpace(cmd.Instructions) ? "" : cmd.Instructions!;
 
         var body = templateBody ?? (cmd.ReminderWindow == "24h"
-            ? "Herinnering: u heeft morgen een {type} op {tijd}. Neem contact op bij vragen."
-            : "Herinnering: u heeft over ongeveer 1 uur een {type} op {tijd}.");
+            ? "Herinnering: u heeft morgen een {type} op {tijd} bij {locatie}.{instructies} Neem contact op bij vragen."
+            : "Herinnering: u heeft over ongeveer 1 uur een {type} op {tijd} bij {locatie}.{instructies}");
 
-        return body.Replace("{type}", serviceType).Replace("{tijd}", timeStr);
+        var instructionsBlock = string.IsNullOrEmpty(instructions) ? "" : $" Belangrijk: {instructions}.";
+
+        return body
+            .Replace("{type}", serviceType)
+            .Replace("{tijd}", timeStr)
+            .Replace("{locatie}", location)
+            .Replace("{instructies}", instructionsBlock);
     }
 }

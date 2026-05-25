@@ -48,7 +48,9 @@ public class ScheduledReminderRepository(
                 r.ReminderWindow,
                 appointment.StartUtc,
                 encryption.DecryptNullable(appointment.ServiceTypeEncrypted),
-                r.Provider);
+                r.Provider,
+                encryption.DecryptNullable(appointment.LocationEncrypted),
+                encryption.DecryptNullable(appointment.InstructionsEncrypted));
         }).ToList();
     }
 

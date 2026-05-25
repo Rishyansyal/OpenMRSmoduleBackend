@@ -21,3 +21,5 @@ Nieuwe ADR? Kopieer een bestaande, verhoog het nummer, en zet de status op `Prop
 - [0013 — Pragmatic automated test strategy](0013-pragmatic-automated-test-strategy.md)
 - [0014 — CI quality gates](0014-ci-quality-gates.md)
 - [0015 — Encryption and webhook security posture](0015-encryption-and-webhook-security-posture.md)
+- [0016 — Observability via OpenTelemetry en Prometheus](0016-observability-stack.md)
+- [0017 — Asynchroon messaging-component als apart, los te schalen deel](0017-async-messaging-as-separate-component.md)

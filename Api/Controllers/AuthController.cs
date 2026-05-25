@@ -52,7 +52,7 @@ public class AuthController(IAuthService authService, ILogger<AuthController> lo
     [HttpGet("me")]
     public IActionResult Me()
     {
-        var id    = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var id = User.FindFirstValue(ClaimTypes.NameIdentifier);
         var email = User.FindFirstValue(ClaimTypes.Email);
         return Ok(new { id, email });
     }
