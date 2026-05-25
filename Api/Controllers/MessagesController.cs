@@ -97,9 +97,9 @@ internal static class MessagingLimits
 }
 
 public record SendMessageApiRequest(
-    [Required] string Provider,
+    [Required][MaxLength(50)] string Provider,
     [Required][MinLength(1)][MaxLength(MessagingLimits.MaxRecipientCount)] string[] Recipients,
     [Required][MaxLength(10_000)] string Content,
-    [Required] string Type,
+    [Required][MaxLength(50)] string Type,
     [MaxLength(200)] string? Subject = null);
 
