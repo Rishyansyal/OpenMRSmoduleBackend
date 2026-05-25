@@ -8,4 +8,6 @@ public record SendReminderCommand(
     string ReminderWindow,
     DateTime EncounterStart,
     string? ServiceType,
-    string Provider);
+    string Provider,
+    string? Location = null,
+    string? Instructions = null);

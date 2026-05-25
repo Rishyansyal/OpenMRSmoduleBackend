@@ -135,6 +135,44 @@ public sealed class BackendIntegrationTests(
         Assert.Empty(await db.ScheduledReminders.ToListAsync());
     }
 
+    [Fact]
+    public async Task DemoSignedAppointment_CanBePostedToRealWebhookEndpoint()
+    {
+        using var client = factory.CreateClient();
+        await AuthenticateAsync(client, "webhook-demo@example.test");
+
+        var demoResponse = await client.PostAsync(
+            "/api/demo/webhooks/openmrs/signed-appointment",
+            content: null);
+
+        Assert.Equal(HttpStatusCode.OK, demoResponse.StatusCode);
+
+        using var demoJson = await JsonDocument.ParseAsync(
+            await demoResponse.Content.ReadAsStreamAsync());
+        var body = demoJson.RootElement.GetProperty("body").GetString();
+        var headers = demoJson.RootElement.GetProperty("headers");
+        Assert.False(string.IsNullOrWhiteSpace(body));
+
+        var request = new HttpRequestMessage(
+            HttpMethod.Post,
+            demoJson.RootElement.GetProperty("webhookPath").GetString())
+        {
+            Content = new StringContent(body!, Encoding.UTF8, "application/json")
+        };
+
+        foreach (var header in headers.EnumerateObject())
+            request.Headers.Add(header.Name, header.Value.GetString());
+
+        var webhookResponse = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Accepted, webhookResponse.StatusCode);
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        Assert.Equal(1, await db.WebhookEventLogs.CountAsync());
+        Assert.Equal(2, await db.ScheduledReminders.CountAsync());
+    }
+
     private static string CreateAppointmentBody(
         string encounterId,
         string patientId,

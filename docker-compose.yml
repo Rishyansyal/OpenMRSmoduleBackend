@@ -40,6 +40,10 @@ services:
       OpenMrs__BaseUrl: ${OPENMRS_BASE_URL:-http://host.docker.internal:3032}
       OpenMrs__Username: ${OPENMRS_USERNAME:?OPENMRS_USERNAME is required}
       OpenMrs__Password: ${OPENMRS_PASSWORD:?OPENMRS_PASSWORD is required}
+      OpenMrs__Poller__Enabled: ${OPENMRS_POLLER_ENABLED:-false}
+      OpenMrs__Poller__IntervalMinutes: ${OPENMRS_POLLER_INTERVAL_MINUTES:-5}
+      OpenMrs__Poller__LookaheadHours: ${OPENMRS_POLLER_LOOKAHEAD_HOURS:-48}
+      OpenMrs__Poller__OrganizationId: ${OPENMRS_POLLER_ORGANIZATION_ID:-openmrs-local}
       Security__EncryptionKey: ${SECURITY_ENCRYPTION_KEY:?SECURITY_ENCRYPTION_KEY is required}
       Encryption__Key: ${ENCRYPTION_KEY:?ENCRYPTION_KEY is required}
       Webhooks__OpenMrs__Secret: ${OPENMRS_WEBHOOK_SECRET:?OPENMRS_WEBHOOK_SECRET is required}

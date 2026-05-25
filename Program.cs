@@ -193,7 +193,9 @@ builder.Services.AddScoped<IMessageLogRepository, MessageLogRepository>();
 // OpenMRS FHIR integratie
 // ---------------------------------------------------------------------------
 builder.Services.Configure<OpenMrsOptions>(builder.Configuration.GetSection("OpenMrs"));
+builder.Services.Configure<OpenMrsPollerOptions>(builder.Configuration.GetSection("OpenMrs:Poller"));
 builder.Services.AddScoped<IOpenMrsService, OpenMrsService>();
+builder.Services.AddHostedService<OpenMrsPollWorker>();
 
 // ---------------------------------------------------------------------------
 // OpenMRS webhook integratie

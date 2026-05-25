@@ -1,93 +1,167 @@
-# OpenMRS Communicatiemodule — Backend
+# OpenMRS Communication Module Backend
 
-ASP.NET Core 10 backend voor het versturen van berichten en afspraakherinneringen via externe messaging providers.
+ASP.NET Core 10 backend for the OpenMRS communication module. It handles authentication, patient lookup through OpenMRS, appointment reminder scheduling, signed OpenMRS webhooks, message sending, message history, and provider integration through FakeComWorld.
 
----
+## Features
 
-## Snel opstarten (alle diensten tegelijk)
+- JWT-based register/login flow.
+- REST API with Swagger UI.
+- PostgreSQL persistence.
+- OpenMRS FHIR/patient integration.
+- Signed OpenMRS appointment webhook endpoint.
+- Optional OpenMRS poll worker for reminder scheduling.
+- Messaging provider adapters for SwiftSend, SecurePost, LegacyLink, and AsyncFlow.
+- Health checks and Prometheus metrics.
 
-Vanuit de bovenliggende map (`2.4/`):
+## Local System Overview
 
-```bash
-../start.ps1
-# of op Linux/macOS:
-../start.sh
-```
+This backend is one of three repositories in the local workspace:
 
----
+| Repo | Purpose | Local URL |
+|---|---|---|
+| `2.4-LU1-openMRS-Avans` | OpenMRS EMR and MariaDB | http://localhost:3032/openmrs |
+| `OpenMRSmoduleBackend` | ASP.NET Core API and PostgreSQL | http://localhost:5111 |
+| `openMRSmoduleFrontend` | Next.js web app | http://localhost:3001 |
 
-## Opstarten (stap voor stap)
+FakeComWorld runs separately on http://localhost:1337 and simulates the external messaging providers.
 
-### 1. Vereisten
+## Prerequisites
 
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (draait PostgreSQL + de API zelf)
-- .NET 10 SDK wanneer je zonder Docker wilt builden/testen
-- OpenMRS draaiend op poort `3032` (zie `openmrs-distro-referenceapplication`)
-- FakeComWorld providers draaiend op poort `1337`
+- Docker Desktop with Docker Compose v2.
+- .NET 10 SDK for local development and tests outside Docker.
+- OpenMRS running on http://localhost:3032.
+- FakeComWorld running on http://localhost:1337.
 
-### 2. FakeComWorld starten
+## Environment Setup
 
-```bash
-# Eerste keer
-docker run -d --name fakecomworld -p 1337:8080 ghcr.io/avansict/in2.4-fakecomworld:main
-
-# Daarna
-docker start fakecomworld
-```
-
-### 3. OpenMRS starten
-
-```bash
-cd ../openmrs-distro-referenceapplication
-docker compose up -d
-```
-
-> OpenMRS is beschikbaar op `http://localhost:3032` — het opstarten duurt ~2 minuten.
-
-### 4. Omgevingsvariabelen instellen
+Create a local `.env` file:
 
 ```bash
 cp .env.example .env
 ```
 
-Open `.env` en vul de waarden in. De FakeComWorld API keys zijn te vinden op `http://localhost:1337`.
+Fill in all required values. At minimum, local Docker startup requires:
 
-### 5. Backend starten
+| Variable | Purpose |
+|---|---|
+| `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | PostgreSQL credentials and database name. |
+| `JWT_SECRET` | JWT signing secret. Use at least 32 characters. |
+| `SECURITY_ENCRYPTION_KEY` | Base64 32-byte encryption key. |
+| `ENCRYPTION_KEY` | Base64 32-byte AES-GCM key. |
+| `OPENMRS_USERNAME`, `OPENMRS_PASSWORD` | OpenMRS credentials used by the backend. |
+| `OPENMRS_WEBHOOK_SECRET` | HMAC secret shared with the OpenMRS webhook module. |
+| `MESSAGING_STUDENT_GROUP` | FakeComWorld student group. |
+| `MESSAGING_*` provider credentials | FakeComWorld provider credentials. |
+
+Generate local keys:
+
+```powershell
+[Convert]::ToBase64String((1..32 | ForEach-Object { Get-Random -Maximum 256 }))
+```
+
+Or with OpenSSL:
 
 ```bash
+openssl rand -base64 32
+```
+
+FakeComWorld credentials can be viewed at http://localhost:1337 after the provider container is running.
+
+## Run All Three Repos Together
+
+From the parent workspace folder (`2.4/`):
+
+```powershell
+.\start.ps1
+```
+
+Windows Command Prompt:
+
+```bat
+start.bat
+```
+
+Linux/macOS/Git Bash:
+
+```bash
+./start.sh
+```
+
+The script starts FakeComWorld, OpenMRS, this backend, and the frontend, then checks the main HTTP endpoints.
+
+## Run Only The Backend
+
+Start dependencies first:
+
+```bash
+# FakeComWorld providers
+docker run -d --name fakecomworld -p 1337:8080 ghcr.io/avansict/in2.4-fakecomworld:main
+# If it already exists:
+docker start fakecomworld
+
+# OpenMRS
+cd ../2.4-LU1-openMRS-Avans
+docker compose up -d
+```
+
+Then start the backend:
+
+```bash
+cd ../OpenMRSmoduleBackend
 docker compose up -d --build
 ```
 
-| Dienst | URL |
+| Service | URL |
 |---|---|
 | REST API | http://localhost:5111 |
 | Swagger UI | http://localhost:5111/swagger |
+| Health check | http://localhost:5111/health |
 | Prometheus metrics | http://localhost:5111/metrics |
 
-### 6. Verificatie
+Verify:
 
 ```bash
 curl http://localhost:5111/health
 ```
 
-Verwacht: `{"status":"Healthy"}`
+Expected response:
 
----
+```json
+{"status":"Healthy"}
+```
 
-## Voorbeeld: eerste aanvraag
+## Local Development Without Docker API Container
+
+Use Docker for PostgreSQL or provide your own connection string, then run:
 
 ```bash
-# 1. Registreer een gebruiker
+dotnet restore
+dotnet run
+```
+
+The default local launch profile uses http://localhost:5111.
+
+## Example API Flow
+
+Register:
+
+```bash
 curl -X POST http://localhost:5111/auth/register \
   -H "Content-Type: application/json" \
   -d '{"email":"user@example.test","password":"<LOCAL_TEST_PASSWORD>"}'
+```
 
-# 2. Login en kopieer het token
+Login:
+
+```bash
 curl -X POST http://localhost:5111/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"user@example.test","password":"<LOCAL_TEST_PASSWORD>"}'
+```
 
-# 3. Stuur een testbericht (vervang <TOKEN> door het JWT uit stap 2)
+Send a test message:
+
+```bash
 curl -X POST http://localhost:5111/api/messages \
   -H "Authorization: Bearer <TOKEN>" \
   -H "Content-Type: application/json" \
@@ -95,24 +169,24 @@ curl -X POST http://localhost:5111/api/messages \
     "provider": "swiftsend",
     "type": "SMS",
     "recipients": ["+31612345678"],
-    "content": "Testbericht vanuit de communicatiemodule."
+    "content": "Test message from the communication module."
   }'
 ```
 
-## OpenMRS webhook
+## OpenMRS Appointment Webhook
 
-OpenMRS stuurt afspraak-events naar:
+OpenMRS posts appointment events to:
 
 ```text
 POST /api/webhooks/openmrs/appointments
 ```
 
-De webhook gebruikt HMAC-SHA256 headers en maakt geplande 24u/1u reminders aan. Zie [webhookdocumentatie](docs/webhook-openmrs-backend.md).
+The endpoint validates HMAC-SHA256 headers, deduplicates events, and creates scheduled 24-hour and 1-hour reminders. See [`docs/webhook-openmrs-backend.md`](docs/webhook-openmrs-backend.md).
 
-Belangrijke secrets in `.env`:
+Important shared secrets:
 
-- `SECURITY_ENCRYPTION_KEY`
 - `OPENMRS_WEBHOOK_SECRET`
+- OpenMRS global property `openmrswebhook.secret`
 
 ## Tests
 
@@ -120,24 +194,41 @@ Belangrijke secrets in `.env`:
 dotnet test OpenMRSmoduleBackend.Tests/OpenMRSmoduleBackend.Tests.csproj
 ```
 
-Dit draait unit tests en automatische integratietests. De integratietests starten de echte ASP.NET Core pipeline met `WebApplicationFactory` en een tijdelijke SQLite database, zodat webhook-, auth-, health- en reminder-endpoints ook in GitHub Actions zonder lokale Docker dependency getest worden.
+The test suite includes unit tests and integration tests using `WebApplicationFactory` with a temporary SQLite database. This allows auth, webhook, health, and reminder endpoints to run in CI without local Docker dependencies.
 
----
-
-## Alles stoppen
+## Useful Docker Commands
 
 ```bash
+# Start backend and PostgreSQL
+docker compose up -d --build
+
+# Show status
+docker compose ps
+
+# Follow API logs
+docker compose logs -f api
+
+# Stop backend and database
 docker compose down
+
+# Stop and remove PostgreSQL volume
+docker compose down -v
+```
+
+To stop the whole local system:
+
+```bash
+cd ../openMRSmoduleFrontend && docker compose down
+cd ../OpenMRSmoduleBackend && docker compose down
+cd ../2.4-LU1-openMRS-Avans && docker compose down
 docker stop fakecomworld
 ```
 
----
+## Documentation
 
-## Meer informatie
-
-- [Architectuurdocumentatie (C4)](docs/c4/README.md)
-- [ADR-logboek](docs/adr/)
+- [Architecture documentation](docs/c4/README.md)
+- [ADR log](docs/adr/README.md)
 - [Requirements](docs/requirements.md)
 - [Security review](docs/security-review.md)
 - [Testing](docs/testing.md)
-- [Agent-instructies](AGENTS.md)
+- [OpenMRS webhook integration](docs/webhook-openmrs-backend.md)
