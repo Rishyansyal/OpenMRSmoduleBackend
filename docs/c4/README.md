@@ -11,7 +11,7 @@ Het C4-model beschrijft de architectuur op vier zoom-niveaus.
 |---|---|---|
 | [Level 1 — Context](01-context.md) | Het systeem in zijn bredere omgeving (zorgmedewerker, patiënt, OpenMRS, messaging providers) | [01-context.png](images/01-context.png) |
 | [Level 2 — Containers](02-containers.md) | De technische bouwstenen: frontend, backend API, database, message bus | [02-containers.png](images/02-containers.png) |
-| [Level 3 — Componenten](03-components.md) | Interne structuur van de backend per architectuurlaag | [03-components.png](images/03-components.png) |
+| [Level 3 — Componenten](03-components.md) | Interne structuur van de backend per architectuurlaag (sync request-flow + async background-flow) | [request](images/03-components-1.png) · [background](images/03-components-2.png) |
 | [Procesdiagram — Herinneringen](04-reminder-process.md) | Sequence van webhook → consumer → patiënt, inclusief handmatige trigger en data-retentie | [1](images/04-reminder-process-1.png) · [2](images/04-reminder-process-2.png) · [3](images/04-reminder-process-3.png) |
 | [Klassediagram](05-class-diagram.md) | UML class diagrams van Domain en Application layer | [1](images/05-class-diagram-1.png) · [2](images/05-class-diagram-2.png) · [3](images/05-class-diagram-3.png) · [4](images/05-class-diagram-4.png) |
 

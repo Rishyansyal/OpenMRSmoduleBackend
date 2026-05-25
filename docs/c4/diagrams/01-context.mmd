@@ -1,23 +1,25 @@
-C4Context
-    title OpenMRS Communicatiemodule — Systeemcontext
+flowchart LR
+    classDef person fill:#08427b,stroke:#073b6f,color:#fff
+    classDef system fill:#1168bd,stroke:#0b4884,color:#fff
+    classDef ext fill:#999999,stroke:#6b6b6b,color:#fff
 
-    Person(zorgmedewerker, "Zorgmedewerker", "Beheert berichten en bekijkt patiëntcommunicatie via de webinterface")
-    Person(patient, "Patiënt", "Ontvangt automatische afspraakherinneringen via SMS of e-mail")
+    zorg["👤 <b>Zorgmedewerker</b><br/><i>[Person]</i><br/>Beheert berichten en<br/>bekijkt patiëntcommunicatie"]:::person
+    patient["👤 <b>Patiënt</b><br/><i>[Person]</i><br/>Ontvangt afspraak-<br/>herinneringen via SMS/e-mail"]:::person
 
-    System(module, "OpenMRS Communicatiemodule", "Verstuurt afspraakherinneringen, beheert berichtenhistorie en integreert met OpenMRS en messaging providers")
+    module(["<b>OpenMRS Communicatiemodule</b><br/><i>[Systeem]</i><br/>Verstuurt herinneringen,<br/>beheert historie en integreert<br/>met OpenMRS + providers"]):::system
 
-    System_Ext(openmrs, "OpenMRS EMR", "Elektronisch medisch dossier. Bron van patiëntdata via FHIR R4 en afspraak-events via signed webhooks")
+    openmrs["<b>OpenMRS EMR</b><br/><i>[Extern systeem]</i><br/>Bron van patiëntdata (FHIR R4)<br/>en afspraak-events (webhook)"]:::ext
 
-    System_Ext(swiftsend, "SwiftSend", "REST messaging provider — SMS en e-mail via X-API-KEY")
-    System_Ext(securepost, "SecurePost", "REST messaging provider — SMS, e-mail en push via JWT")
-    System_Ext(legacylink, "LegacyLink", "SOAP messaging provider — SMS via HTTP Basic auth")
-    System_Ext(asyncflow, "AsyncFlow", "Async messaging provider — berichten via queue met statuspolling")
+    subgraph providers["Messaging Providers (extern)"]
+        direction TB
+        swift["<b>SwiftSend</b><br/>REST — X-API-KEY"]:::ext
+        secure["<b>SecurePost</b><br/>REST — JWT"]:::ext
+        legacy["<b>LegacyLink</b><br/>SOAP — Basic auth"]:::ext
+        async["<b>AsyncFlow</b><br/>REST — async + polling"]:::ext
+    end
 
-    Rel(zorgmedewerker, module, "Stuurt berichten, bekijkt geschiedenis en patiënten", "HTTPS")
-    Rel(openmrs, module, "Stuurt afspraak-events", "Signed webhook / HTTPS")
-    Rel(module, openmrs, "Haalt patiëntcontact op", "FHIR R4 / HTTPS")
-    Rel(module, swiftsend, "Verstuurt SMS/e-mail", "REST / HTTPS")
-    Rel(module, securepost, "Verstuurt SMS/e-mail/push", "REST / HTTPS")
-    Rel(module, legacylink, "Verstuurt SMS", "SOAP / HTTPS")
-    Rel(module, asyncflow, "Verstuurt berichten asynchroon", "REST / HTTPS")
-    Rel_Back(patient, module, "Ontvangt herinneringen via provider")
+    zorg -->|"Stuurt berichten,<br/>bekijkt geschiedenis<br/>[HTTPS]"| module
+    openmrs -->|"Stuurt afspraak-events<br/>[Signed webhook / HTTPS]"| module
+    module -->|"Haalt patiëntcontact op<br/>[FHIR R4 / HTTPS]"| openmrs
+    module -->|"Verstuurt berichten<br/>[REST + SOAP / HTTPS]"| providers
+    providers -.->|"SMS / e-mail / push"| patient
