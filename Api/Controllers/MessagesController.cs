@@ -16,7 +16,7 @@ public class MessagesController(
     IAsyncMessageProvider asyncFlow,
     IMessageLogRepository messageLogRepository) : ControllerBase
 {
-    private const int MaxHistoryCount   = 100;
+    private const int MaxHistoryCount = 100;
 
     [HttpGet("providers")]
     public IActionResult GetProviders() =>
@@ -38,14 +38,14 @@ public class MessagesController(
 
             await messageLogRepository.LogAsync(new MessageLog
             {
-                Provider         = request.Provider,
-                MessageType      = request.Type,
-                RecipientCount   = request.Recipients.Length,
-                FailedCount      = result.FailedRecipients.Length,
+                Provider = request.Provider,
+                MessageType = request.Type,
+                RecipientCount = request.Recipients.Length,
+                FailedCount = result.FailedRecipients.Length,
                 ProviderMessageId = result.MessageId,
-                Success          = result.Success,
-                ErrorCode        = result.Error is null ? null : "SEND_ERROR",
-                SentByUserId     = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "unknown"
+                Success = result.Success,
+                ErrorCode = result.Error is null ? null : "SEND_ERROR",
+                SentByUserId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "unknown"
             }, ct);
 
             return Ok(result);
@@ -59,6 +59,17 @@ public class MessagesController(
     [HttpGet("status/{trackingId}")]
     public async Task<IActionResult> GetStatus(string trackingId, CancellationToken ct)
     {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(userId))
+            return Unauthorized();
+
+        // Ownership-check: de huidige gebruiker mag alleen de status opvragen van
+        // berichten die hij/zij zelf heeft verzonden. Geeft 404 (niet 403) terug om
+        // niet te lekken of het tracking-id bestaat.
+        var owns = await messageLogRepository.UserOwnsProviderMessageIdAsync(userId, trackingId, ct);
+        if (!owns)
+            return NotFound();
+
         var result = await asyncFlow.GetStatusAsync(trackingId, ct);
         return Ok(result);
     }
@@ -66,9 +77,15 @@ public class MessagesController(
     [HttpGet("history")]
     public async Task<IActionResult> GetHistory([FromQuery] int count = 50, CancellationToken ct = default)
     {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(userId))
+            return Unauthorized();
+
         // Begrens het aantal records om zware DB-queries te voorkomen (DoS-bescherming)
         count = Math.Clamp(count, 1, MaxHistoryCount);
-        var logs = await messageLogRepository.GetRecentAsync(count, ct);
+        // Filter expliciet op SentByUserId — voorkomt dat gebruiker A de verzendhistorie
+        // van gebruiker B kan inzien (horizontal privilege escalation).
+        var logs = await messageLogRepository.GetRecentByUserAsync(userId, count, ct);
         return Ok(logs);
     }
 }
