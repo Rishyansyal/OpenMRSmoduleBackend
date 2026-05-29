@@ -55,7 +55,7 @@ if (jwtSecret.Length < 32)
 // ---------------------------------------------------------------------------
 // CORS — alleen geconfigureerde origins toestaan, geen wildcard
 // ---------------------------------------------------------------------------
-var allowedOrigins = (builder.Configuration["Cors:AllowedOrigins"] ?? "http://localhost:3001")
+var allowedOrigins = (builder.Configuration["Cors:AllowedOrigins"] ?? "http://localhost:3032")
     .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
 builder.Services.AddCors(options =>

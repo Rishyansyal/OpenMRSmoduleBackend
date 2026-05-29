@@ -27,19 +27,19 @@ public class OpenMrsWebhookDemoController(IOptions<OpenMrsWebhookOptions> option
         }
 
         var timestamp = DateTimeOffset.UtcNow.ToString("O");
-        var eventId = $"frontend-demo-{Guid.NewGuid():N}";
-        var encounterId = $"enc-frontend-demo-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}";
+        var eventId = $"api-demo-{Guid.NewGuid():N}";
+        var encounterId = $"enc-api-demo-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}";
         var start = DateTimeOffset.UtcNow.AddDays(3);
         var body = JsonSerializer.Serialize(new
         {
             encounterId,
-            patientId = "patient-frontend-demo",
+            patientId = "patient-api-demo",
             start = start.ToString("O"),
             status = "scheduled",
             patientDisplay = "Demo Patient",
             serviceType = "Controle",
             location = "Demo Room",
-            instructions = "Demonstratie webhook flow vanuit de frontend"
+            instructions = "Demonstratie webhook flow via de API"
         }, JsonOptions);
 
         var signature = OpenMrsWebhookSignatureValidator.ComputeSignatureHex(timestamp, body, secret);

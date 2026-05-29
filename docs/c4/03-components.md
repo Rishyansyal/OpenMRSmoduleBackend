@@ -4,7 +4,7 @@ Interne structuur van de ASP.NET Core backend, opgesplitst in twee views voor le
 
 ## 3a · Synchrone request-flow
 
-Inkomende HTTP-requests vanuit de frontend en de OpenMRS-webhook.
+Inkomende HTTP-requests van API-clients en de OpenMRS-webhook.
 
 ```mermaid
 flowchart LR
@@ -15,7 +15,7 @@ flowchart LR
     classDef layerApp fill:#e0e7ff,stroke:#4338ca,color:#000
     classDef layerInfra fill:#dcfce7,stroke:#166534,color:#000
 
-    frontend["<b>Frontend</b><br/>[Next.js]"]:::ext
+    client["<b>API Client</b><br/>[Swagger / REST]"]:::ext
     openmrs["<b>OpenMRS</b><br/>[FHIR + webhook]"]:::ext
     db[("<b>PostgreSQL</b>")]:::db
 
@@ -50,10 +50,10 @@ flowchart LR
     class appLayer layerApp
     class infraLayer layerInfra
 
-    frontend -->|JWT auth| authCtrl
-    frontend -->|Berichten beheren| msgCtrl
-    frontend -->|Patiënten ophalen| openmrsCtrl
-    frontend -->|Herinneringen| reminderCtrl
+    client -->|JWT auth| authCtrl
+    client -->|Berichten beheren| msgCtrl
+    client -->|Patiënten ophalen| openmrsCtrl
+    client -->|Herinneringen| reminderCtrl
     openmrs -->|Signed webhook| webhookCtrl
 
     authCtrl --> authSvc

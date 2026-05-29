@@ -8,14 +8,13 @@ Accepted
 
 ## Context
 
-Het project had geen consistente GitHub Actions checks voor backend, frontend en OpenMRS-module.
+Het project had geen consistente GitHub Actions checks voor de backend en de OpenMRS-module.
 
 ## Decision
 
 Iedere repository krijgt een eigen workflow:
 
 - Backend CI: restore, build, xUnit tests, Docker build en secret scan.
-- Frontend CI: `npm ci`, lint, Vitest, Next build, Playwright smoke en secret scan.
 - OpenMRS CI: Java 21/Maven tests voor de webhook-module, distro package check en secret scan.
 
 ## Overwogen alternatieven

@@ -23,9 +23,9 @@ Storage: EF Core met PostgreSQL provider (zie [ADR 0004](0004-use-postgresql.md)
 | Alternatief | Reden van afval |
 |---|---|
 | **Zelf auth-endpoints schrijven (custom `AuthController` + JWT)** | Bekende foutbron: timing-attacks op login, password-hashing fouten, vergeten lockout, brute-force protection en token-revocation. Niet de wiel die we willen heruitvinden in een onderwijsproject. |
-| **Duende IdentityServer / OpenIddict** | Volwaardige OIDC/OAuth2 server. Overkill voor één first-party frontend; Duende vereist commerciële licentie boven een omzetdrempel. |
+| **Duende IdentityServer / OpenIddict** | Volwaardige OIDC/OAuth2 server. Overkill voor één first-party client; Duende vereist commerciële licentie boven een omzetdrempel. |
 | **Auth0 / Clerk / Supabase Auth** | Vendor-lock-in en kostenmodel ongewenst voor een Avans-project; data-residency lastig. |
-| **JWT-only zonder users-tabel (stateless API-key per user)** | Geen account-management, geen lockout, geen password-reset; werkt niet voor een zorgmedewerker-frontend met dagelijks gebruik. |
+| **JWT-only zonder users-tabel (stateless API-key per user)** | Geen account-management, geen lockout, geen password-reset; werkt niet voor dagelijks gebruik door zorgmedewerkers. |
 
 ## Consequences
 
