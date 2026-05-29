@@ -14,11 +14,7 @@ flowchart TB
     classDef volume fill:#dcfce7,stroke:#166534,stroke-width:1px,color:#000
 
     subgraph Host["💻 Developer Machine (Docker Desktop)"]
-        Browser["🌐 Browser<br/>localhost:3001"]:::ext
-
-        subgraph netFront["frontend network"]
-            FE["📦 frontend<br/>Next.js 16<br/>:3001"]:::container
-        end
+        Browser["🌐 Browser<br/>localhost:3032"]:::ext
 
         subgraph netBackend["backend network (bridge)"]
             API["📦 api<br/>ASP.NET Core 10<br/>:5111 → :8080<br/>read-only, no-new-privileges, cap_drop ALL"]:::container
@@ -38,8 +34,7 @@ flowchart TB
         FAKE["📦 fakecomworld<br/>:1337 → :8080<br/>standalone container"]:::container
     end
 
-    Browser -->|HTTPS in prod / HTTP dev| FE
-    FE -->|fetch /api/* met JWT| API
+    Browser -->|HTTPS in prod / HTTP dev| GW
     API -->|TCP 5432| DB
     DB --> VolPG
     API -.->|HTTPS :3032| GW
@@ -58,7 +53,6 @@ flowchart TB
 |---|---|---|---|---|
 | `api` | `OpenMRSmoduleBackend` (custom build) | `127.0.0.1:5111 → 8080` | tmpfs `/tmp` | read_only, cap_drop ALL, no-new-privileges |
 | `db` | `postgres:17-alpine` | — (internal only) | `pgdata` | no-new-privileges |
-| `frontend` | `openmrsmodulefrontend` (custom build) | `3001:3001` | — | — |
 | `gateway` | `openmrs/openmrs-reference-application-3-gateway:qa` | `3032:80` | — | — |
 | `openmrs-frontend` | `openmrs/openmrs-reference-application-3-frontend:qa` | — | — | — |
 | `openmrs-backend` | `openmrs/openmrs-reference-application-3-backend:qa` | `5005:5005` (debug) | `openmrs-data` | — |
@@ -82,7 +76,6 @@ flowchart TB
     end
 
     subgraph App["Applicatie-tier"]
-        FEpod["📦 frontend (Next.js)<br/>:3001"]:::pod
         APIpod["📦 api (ASP.NET Core)<br/>:8080"]:::pod
         Bus["📦 RabbitMQ<br/>:5672"]:::pod
     end
@@ -101,10 +94,8 @@ flowchart TB
     end
 
     Zorg -->|HTTPS :443| LB
-    LB -->|HTTP :3001| FEpod
     LB -->|HTTP :8080| APIpod
     OMRS -->|signed webhook :443| LB
-    FEpod -.->|server-side| APIpod
     APIpod --> PG
     APIpod --> Bus
     Bus --> APIpod
@@ -122,7 +113,7 @@ flowchart TB
 | **API-isolatie** | API gebind op `127.0.0.1:5111` in dev (`API_PORT=127.0.0.1:5111`) |
 | **Container hardening** | `read_only: true`, `cap_drop: ALL`, `no-new-privileges:true`, tmpfs `/tmp` |
 | **Secrets** | `.env`-file, nooit in image of compose-defaults ([ADR-0006](../adr/0006-secrets-via-env-file.md)) |
-| **CORS** | Whitelist via `ALLOWED_ORIGINS`, geen wildcard |
+| **CORS** | Niet van toepassing — geen aparte browser-frontend; API-aanroepen verlopen server-to-server |
 | **Rate limiting** | Per-IP: 5/min auth, 10/min messaging, 100/min global |
 | **AES-256-GCM** | PII bij rust in DB (encounter_id, patient data) |
 
@@ -130,8 +121,7 @@ flowchart TB
 
 `start.sh` start de stack in deze volgorde:
 1. **FakeComWorld** — standalone container (geen netwerkafhankelijkheid)
-2. **OpenMRS distro** — gateway + frontend + backend + mariadb (~2 min)
+2. **OpenMRS distro** — gateway + openmrs-frontend + openmrs-backend + mariadb (~2 min)
 3. **Backend + Postgres** — eigen compose, leest `.env`
-4. **Frontend** — Next.js, hangt aan backend
 
 Het script sourcet credentials uit `OpenMRSmoduleBackend/.env` zodat er één bron van waarheid is.

@@ -10,7 +10,7 @@ Accepted
 
 Tijdens de workshop *Applicatie-integratie* is gevraagd om expliciet één architectonisch apart component te verantwoorden: welk deel van het systeem leeft op zichzelf, draait in een eigen proces/container, kan onafhankelijk schalen of falen, en waarom is die scheiding nodig in plaats van alles in één deployable te proppen.
 
-Onze [containerview (C4 L2)](../c4/02-containers.md) toont vier containers: frontend, backend API, database en **message bus**. De eerste drie zijn standaard SaaS-bouwstenen. Het vierde — de message bus + de bijbehorende worker/consumer-keten — is de niet-vanzelfsprekende keuze. Drie functionele eisen vragen om asynchrone verwerking die *niet* op een inkomend HTTP-request mag wachten:
+Onze [containerview (C4 L2)](../c4/02-containers.md) toont drie containers: backend API, database en **message bus**. De eerste twee zijn standaard bouwstenen. Het vierde — de message bus + de bijbehorende worker/consumer-keten — is de niet-vanzelfsprekende keuze. Drie functionele eisen vragen om asynchrone verwerking die *niet* op een inkomend HTTP-request mag wachten:
 
 1. **Reminders 24 u en 1 u vooraf** (FE-1). Een afspraak op donderdag 14:00 vereist een 24h-reminder op woensdag 14:00 — de webhook van OpenMRS komt nú binnen, het bericht moet straks weg. Synchroon afhandelen vanuit de webhookcontroller is onmogelijk.
 2. **Provider-uitval / rate-limiting** (NFE-7). SwiftSend heeft 10/min limiet, SecurePost JWT-expiry, LegacyLink SOAP timeouts. Retries en backoff horen niet in een controller — een gefaalde provider mag de webhook niet 30 s laten hangen of een 5xx geven aan OpenMRS.

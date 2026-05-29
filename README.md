@@ -21,7 +21,6 @@ This backend is one of three repositories in the local workspace:
 |---|---|---|
 | `2.4-LU1-openMRS-Avans` | OpenMRS EMR and MariaDB | http://localhost:3032/openmrs |
 | `OpenMRSmoduleBackend` | ASP.NET Core API and PostgreSQL | http://localhost:5111 |
-| `openMRSmoduleFrontend` | Next.js web app | http://localhost:3001 |
 
 FakeComWorld runs separately on http://localhost:1337 and simulates the external messaging providers.
 
@@ -67,19 +66,9 @@ openssl rand -base64 32
 
 FakeComWorld credentials can be viewed at http://localhost:1337 after the provider container is running.
 
-## Run All Three Repos Together
+## Run The Full Stack
 
 From the parent workspace folder (`2.4/`):
-
-```powershell
-.\start.ps1
-```
-
-Windows Command Prompt:
-
-```bat
-start.bat
-```
 
 Linux/macOS/Git Bash:
 
@@ -87,7 +76,7 @@ Linux/macOS/Git Bash:
 ./start.sh
 ```
 
-The script starts FakeComWorld, OpenMRS, this backend, and the frontend, then checks the main HTTP endpoints.
+The script starts FakeComWorld, OpenMRS, and this backend.
 
 ## Run Only The Backend
 
@@ -218,7 +207,6 @@ docker compose down -v
 To stop the whole local system:
 
 ```bash
-cd ../openMRSmoduleFrontend && docker compose down
 cd ../OpenMRSmoduleBackend && docker compose down
 cd ../2.4-LU1-openMRS-Avans && docker compose down
 docker stop fakecomworld

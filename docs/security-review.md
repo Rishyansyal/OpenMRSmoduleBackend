@@ -11,7 +11,7 @@
 | RabbitMQ default credentials | Opgelost | Geen fallback meer; username/password zijn verplicht zodra `RabbitMq:Host` is gezet |
 | OpenMRS demo credentials | Verbeterd | `.env.example` bevat placeholders; lokale `.env` moet eigen service-user credentials bevatten |
 | OpenMRS debug port `5005` | Opgelost in default compose | Debug port wordt niet meer standaard gepubliceerd |
-| JWT in localStorage | Geaccepteerd frontend ADR | Simpel dev-patroon; XSS-risico documenteren en CSP/sanitization toepassen |
+| JWT opslag | Niet van toepassing — geen browser-frontend; tokens worden uitgewisseld via server-to-server of directe API-clients |
 | Horizontale privilege-escalation op `/api/messages/history` | Opgelost | History gefilterd op `SentByUserId == currentUser`; bewezen door `AuthorizationTests.MessagesHistory_ReturnsOnlyCurrentUsersLogs`. Zie [auth-audit.md](auth-audit.md#f-1) |
 | IDOR op `/api/messages/status/{trackingId}` | Opgelost | Ownership-check via `UserOwnsProviderMessageIdAsync` + 404 bij miss om bestaan niet te lekken; bewezen door `AuthorizationTests.MessagesStatus_ReturnsNotFound_ForOtherUsersTrackingId`. Zie [auth-audit.md](auth-audit.md#f-2) |
 | IDOR op `/api/openmrs/patients/{id}` | Geaccepteerd (MVP) | Multi-tenancy uit scope; in single-tenant identiek aan OpenMRS' eigen autorisatie. Zie [auth-audit.md](auth-audit.md#f-3) |

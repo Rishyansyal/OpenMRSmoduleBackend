@@ -53,23 +53,6 @@ if (jwtSecret.Length < 32)
         "Jwt:SecretKey moet minimaal 32 tekens bevatten (256 bits voor HMAC-SHA256).");
 
 // ---------------------------------------------------------------------------
-// CORS — alleen geconfigureerde origins toestaan, geen wildcard
-// ---------------------------------------------------------------------------
-var allowedOrigins = (builder.Configuration["Cors:AllowedOrigins"] ?? "http://localhost:3001")
-    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
-builder.Services.AddCors(options =>
-{
-    options.AddDefaultPolicy(policy =>
-    {
-        policy.WithOrigins(allowedOrigins)
-              .AllowAnyHeader()
-              .AllowAnyMethod()
-              .AllowCredentials();
-    });
-});
-
-// ---------------------------------------------------------------------------
 // Rate limiting — beschermt endpoints tegen misbruik en brute-force aanvallen
 // ---------------------------------------------------------------------------
 builder.Services.AddRateLimiter(opts =>
@@ -409,10 +392,6 @@ app.UseCookiePolicy();
 // Routing expliciet uitvoeren zodat endpoint-metadata beschikbaar is
 // voor middleware zoals rate limiting.
 app.UseRouting();
-
-// CORS — vóór authenticatie/autorisatie
-// UseCors onderschept ook OPTIONS-preflight-verzoeken vóór controllers ze verwerpen
-app.UseCors();
 
 // Rate limiting — na routing zodat endpoint-specifieke policies via
 // [EnableRateLimiting] betrouwbaar toegepast kunnen worden.

@@ -19,7 +19,7 @@ De **OpenMRS Communicatiemodule** vult dat gat. Het is een zelfstandig SaaS-syst
 
 - afspraak-events uit OpenMRS ontvangt via een signed webhook;
 - patiënten automatisch herinnert (24 uur en 1 uur vooraf) via één van vier messaging-providers;
-- zorgmedewerkers een webinterface biedt om handmatig berichten te sturen, patiënten te zoeken en berichthistorie te raadplegen;
+- zorgmedewerkers via de REST API (of Swagger UI) handmatig berichten laat sturen, patiënten laat zoeken en berichthistorie laat raadplegen;
 - patiëntdata versleuteld opslaat en binnen 14 dagen verwijdert volgens GDPR-principes.
 
 ### 1.2 Leeswijzer
@@ -51,7 +51,7 @@ Het systeem dient vijf actoren ([06-use-case.md](c4/06-use-case.md)):
 | **OpenMRS EMR** | Extern systeem. Bron van patiëntcontact en afspraak-events. | UC9 appointment-event verzenden |
 | **Messaging Provider** | Extern systeem (SwiftSend, SecurePost, LegacyLink, AsyncFlow). Bezorgt feitelijk het bericht. | UC12 bezorging |
 
-De primaire **waardeketen** is: OpenMRS → webhook → reminder geplanned in DB → worker → message bus → consumer → provider → patiënt. Daarnaast is er een **synchrone ad-hoc keten**: zorgmedewerker → frontend → API → provider.
+De primaire **waardeketen** is: OpenMRS → webhook → reminder geplanned in DB → worker → message bus → consumer → provider → patiënt. Daarnaast is er een **synchrone ad-hoc keten**: zorgmedewerker → API → provider.
 
 ---
 
@@ -67,7 +67,7 @@ Het systeem heeft drie externe afhankelijkheden ([01-context.md](c4/01-context.m
    - SecurePost (REST, JWT met 3-min expiry, token-cache nodig)
    - LegacyLink (SOAP/XML, HTTP Basic, alleen SMS, per ontvanger)
    - AsyncFlow (REST, X-API-KEY, submit + poll-pattern)
-3. **Zorgmedewerker** — verbindt via browser/HTTPS met de frontend.
+3. **Zorgmedewerker** — verbindt via OpenMRS of directe API-aanroepen met het systeem.
 
 De keuze om **vier heterogene providers** te ondersteunen via één uniforme interface dwingt een Strategy Pattern af in de backend (zie §6.2). Dat is geen toeval — het Avans-praktijklab levert deze providers als FakeComWorld bewust met verschillende contracten om integratiekwaliteit te toetsen.
 
@@ -81,14 +81,12 @@ De module bestaat uit vier containers binnen één deployable systeem ([02-conta
 
 | Container | Technologie | Verantwoordelijkheid | Poort |
 |---|---|---|---|
-| **Frontend** | Next.js 16 | Login, dashboard, berichten, geschiedenis, patiëntenzoeken | 3001 |
 | **Backend API** | ASP.NET Core 10 | REST + JWT, signed webhook-endpoint, reminderscheduling, retentie | 5111 |
 | **Database** | PostgreSQL 17 | Users, message_logs, reminder_logs, encrypted appointment-data | 5432 (intern) |
 | **Message Bus** | MassTransit | `SendReminderCommand` — in-memory (dev) / RabbitMQ (prod) | 5672 (prod) |
 
 **Waarom deze opdeling?**
 
-- **Frontend ≠ backend**: het toestaan van onafhankelijke deploys van UI en API maakt iteratie sneller; Next.js levert SSR + rijke client-rendering uit dezelfde codebase ([ADR-0007](adr/0007-nextjs-for-frontend.md)).
 - **Aparte message bus**: tijdgevoelige werken (reminders 5 minuten resolutie, dagelijkse retentie) mogen het HTTP-request-cycle niet blokkeren ([ADR-0009](adr/0009-masstransit-for-async-messaging.md)).
 - **PostgreSQL ipv SQL Server / MySQL**: open source, brede hosting, JSONB + degelijke transactions ([ADR-0004](adr/0004-use-postgresql.md)).
 
@@ -236,11 +234,9 @@ Elke 24 uur draait `DataRetentionWorker.RunAsync()` vier `DELETE` statements:
 
 Resultaat wordt gelogd; geen dry-run-mode (bewust — retentie is wet, niet optioneel).
 
-### 7.4 User flow — zorgmedewerker
+### 7.4 API-workflows — zorgmedewerker
 
-![Global navigation](c4/images/07-user-flow-1.png)
-
-De vier hoofdtaken in de frontend ([07-user-flow.md](c4/07-user-flow.md)):
+De vier hoofd-API-workflows ([07-user-flow.md](c4/07-user-flow.md)):
 
 | Flow | Schermen | API-calls |
 |---|---|---|
@@ -260,13 +256,12 @@ De **vijftien ADR's** vormen samen het hart van dit verslag. Hier is de groeperi
 ### 8.1 Procesafspraken
 - **[ADR-0001](adr/0001-record-architecture-decisions.md)** — elke significante keuze krijgt een ADR (Context → Decision → Consequences).
 - **[ADR-0011](adr/0011-layered-folder-structure.md)** — layered mappenstructuur binnen één `.csproj`. Compiler dwingt richting niet af; reviewers wel.
-- **[ADR-0014](adr/0014-ci-quality-gates.md)** — drie repos, drie GitHub Actions: backend (build + xUnit + Docker + secret scan), frontend (lint + Vitest + Next build + Playwright), OpenMRS-module (Maven + distro check). PR's falen vroeg.
+- **[ADR-0014](adr/0014-ci-quality-gates.md)** — twee repos, twee GitHub Actions: backend (build + xUnit + Docker + secret scan), OpenMRS-module (Maven + distro check). PR's falen vroeg.
 
 ### 8.2 Stack-keuzes
 - **[ADR-0002](adr/0002-use-dapper-as-orm.md)** — Dapper voor domein-queries (geen N+1 verrassingen). EF Core enkel voor Identity.
 - **[ADR-0003](adr/0003-use-identity-framework-for-auth.md)** — ASP.NET Core Identity met `MapIdentityApi<IdentityUser>()`. Geen handgeschreven AuthController.
 - **[ADR-0004](adr/0004-use-postgresql.md)** — PostgreSQL 17. Provider Npgsql voor zowel EF Core als Dapper.
-- **[ADR-0007](adr/0007-nextjs-for-frontend.md)** — Next.js 16 frontend (rijp ecosysteem, breed inzetbaar).
 - **[ADR-0009](adr/0009-masstransit-for-async-messaging.md)** — MassTransit als message bus. In-memory dev, RabbitMQ prod.
 
 ### 8.3 Integratie & security
@@ -278,7 +273,7 @@ De **vijftien ADR's** vormen samen het hart van dit verslag. Hier is de groeperi
 - **[ADR-0015](adr/0015-encryption-and-webhook-security-posture.md)** — AES-256-GCM via `Security:EncryptionKey` (`SECURITY_ENCRYPTION_KEY` env-var). Geen raw payload in DB; logs zonder PII.
 
 ### 8.4 Test- en kwaliteitsstrategie
-- **[ADR-0013](adr/0013-pragmatic-automated-test-strategy.md)** — testpiramide: backend xUnit (HMAC, encryptie, idempotency), frontend Vitest + Playwright smoke, OpenMRS-module Maven/JUnit. Volledige containervalidatie blijft handmatig — bewuste keuze voor PR-snelheid.
+- **[ADR-0013](adr/0013-pragmatic-automated-test-strategy.md)** — testpiramide: backend xUnit (HMAC, encryptie, idempotency), OpenMRS-module Maven/JUnit. Volledige containervalidatie blijft handmatig — bewuste keuze voor PR-snelheid.
 
 ---
 
@@ -320,8 +315,8 @@ De niet-functionele eisen uit [requirements.md](requirements.md) en hun architec
 Drie compose-projecten op één developer-machine ([09-deployment.md](c4/09-deployment.md)):
 
 1. **FakeComWorld** standalone (`:1337`) — simuleert de vier messaging-providers.
-2. **OpenMRS distro** — gateway (`:3032`) + frontend + backend + mariadb.
-3. **OpenMRSmoduleBackend** — eigen `api` + Postgres + frontend op `:3001`.
+2. **OpenMRS distro** — gateway (`:3032`) + openmrs-frontend + openmrs-backend + mariadb.
+3. **OpenMRSmoduleBackend** — eigen `api` + Postgres.
 
 `start.sh` orkestreert de opstartvolgorde en sourcet credentials uit één `.env` zodat er geen drift is tussen services.
 
@@ -334,7 +329,7 @@ Drie compose-projecten op één developer-machine ([09-deployment.md](c4/09-depl
 Drielagig:
 
 - **DMZ:** reverse proxy met TLS 1.3-terminatie, HSTS, HTTPS-redirect.
-- **App-tier:** frontend pod, API pod, RabbitMQ pod. Geen directe internet-toegang behalve via de proxy.
+- **App-tier:** API pod, RabbitMQ pod. Geen directe internet-toegang behalve via de proxy.
 - **Data-tier (privé):** PostgreSQL met AES-at-rest en backups. Geen public port.
 - **Observability:** Prometheus scrape op `/metrics` via OpenTelemetry.
 - **Externe afhankelijkheden:** OpenMRS EMR (FHIR R4 + webhook) en de vier messaging-providers buiten het cluster.
@@ -347,7 +342,7 @@ Belangrijke productie-eisen die in dev al worden gespiegeld:
 | DB-isolatie | PostgreSQL geen public port, alleen backend-netwerk |
 | Container-hardening | read-only fs, cap_drop ALL, no-new-privileges |
 | Secrets | Geen `.env` in prod — Azure Key Vault / Kubernetes secrets |
-| CORS | Whitelist via `ALLOWED_ORIGINS`, geen wildcard |
+| CORS | Niet van toepassing — geen aparte browser-frontend |
 | Rate limiting | 5/min auth, 10/min messaging, 100/min global |
 | AES-256-GCM | PII at rest in PostgreSQL |
 
