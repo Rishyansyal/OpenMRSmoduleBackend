@@ -113,7 +113,7 @@ flowchart TB
 | **API-isolatie** | API gebind op `127.0.0.1:5111` in dev (`API_PORT=127.0.0.1:5111`) |
 | **Container hardening** | `read_only: true`, `cap_drop: ALL`, `no-new-privileges:true`, tmpfs `/tmp` |
 | **Secrets** | `.env`-file, nooit in image of compose-defaults ([ADR-0006](../adr/0006-secrets-via-env-file.md)) |
-| **CORS** | Niet van toepassing — geen aparte browser-frontend; API-aanroepen verlopen server-to-server |
+| **CORS** | Whitelist via `ALLOWED_ORIGINS` (standaard: OpenMRS op `:3032`), geen wildcard |
 | **Rate limiting** | Per-IP: 5/min auth, 10/min messaging, 100/min global |
 | **AES-256-GCM** | PII bij rust in DB (encounter_id, patient data) |
 

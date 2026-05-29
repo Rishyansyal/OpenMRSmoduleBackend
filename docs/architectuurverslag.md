@@ -342,7 +342,7 @@ Belangrijke productie-eisen die in dev al worden gespiegeld:
 | DB-isolatie | PostgreSQL geen public port, alleen backend-netwerk |
 | Container-hardening | read-only fs, cap_drop ALL, no-new-privileges |
 | Secrets | Geen `.env` in prod — Azure Key Vault / Kubernetes secrets |
-| CORS | Niet van toepassing — geen aparte browser-frontend |
+| CORS | Whitelist via `ALLOWED_ORIGINS` (standaard: OpenMRS op `:3032`), geen wildcard |
 | Rate limiting | 5/min auth, 10/min messaging, 100/min global |
 | AES-256-GCM | PII at rest in PostgreSQL |
 

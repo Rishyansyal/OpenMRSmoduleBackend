@@ -36,6 +36,7 @@ services:
       Jwt__SecretKey: ${JWT_SECRET:?JWT_SECRET is required}
       Jwt__Issuer: OpenMRSmoduleBackend
       Jwt__Audience: OpenMRSmoduleBackend
+      Cors__AllowedOrigins: ${ALLOWED_ORIGINS:-http://localhost:3032}
       OpenMrs__BaseUrl: ${OPENMRS_BASE_URL:-http://host.docker.internal:3032}
       OpenMrs__Username: ${OPENMRS_USERNAME:?OPENMRS_USERNAME is required}
       OpenMrs__Password: ${OPENMRS_PASSWORD:?OPENMRS_PASSWORD is required}
