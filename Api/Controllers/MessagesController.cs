@@ -34,6 +34,7 @@ public class MessagesController(
             var result = await messagingService.SendAsync(
                 request.Provider,
                 new SendMessageRequest(request.Recipients, request.Content, request.Type, request.Subject),
+                request.OrganizationId,
                 ct);
 
             await messageLogRepository.LogAsync(new MessageLog
@@ -70,7 +71,7 @@ public class MessagesController(
         if (!owns)
             return NotFound();
 
-        var result = await asyncFlow.GetStatusAsync(trackingId, ct);
+        var result = await asyncFlow.GetStatusAsync(trackingId, configuration: null, ct);
         return Ok(result);
     }
 
@@ -101,5 +102,6 @@ public record SendMessageApiRequest(
     [Required][MinLength(1)][MaxLength(MessagingLimits.MaxRecipientCount)] string[] Recipients,
     [Required][MaxLength(10_000)] string Content,
     [Required][MaxLength(50)] string Type,
-    [MaxLength(200)] string? Subject = null);
+    [MaxLength(200)] string? Subject = null,
+    [MaxLength(100)] string? OrganizationId = null);
 

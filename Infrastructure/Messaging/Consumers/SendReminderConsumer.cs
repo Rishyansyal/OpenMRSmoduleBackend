@@ -32,14 +32,19 @@ public class SendReminderConsumer(
             return;
         }
 
-        var patient = await openMrsService.GetPatientAsync(cmd.PatientId, ct);
+        await scheduledReminderRepository.MarkSendingAsync(cmd.ScheduledReminderId, ct);
+
+        var patient = await openMrsService.GetPatientAsync(cmd.OrganizationId, cmd.PatientId, ct);
         if (patient is null)
         {
             logger.LogWarning("Patiënt niet gevonden voor encounter {enc}.",
                 cmd.EncounterId);
-            await scheduledReminderRepository.MarkFailedAsync(
+            await scheduledReminderRepository.RecordDeliveryAttemptAsync(
                 cmd.ScheduledReminderId,
-                "PATIENT_NOT_FOUND",
+                success: false,
+                retryable: false,
+                providerMessageId: null,
+                errorCode: "PATIENT_NOT_FOUND",
                 ct);
             return;
         }
@@ -49,9 +54,12 @@ public class SendReminderConsumer(
         {
             logger.LogInformation("Patiënt voor encounter {enc} heeft geen contactgegevens — herinnering overgeslagen.",
                 cmd.EncounterId);
-            await scheduledReminderRepository.MarkFailedAsync(
+            await scheduledReminderRepository.RecordDeliveryAttemptAsync(
                 cmd.ScheduledReminderId,
-                "NO_CONTACT_DETAILS",
+                success: false,
+                retryable: false,
+                providerMessageId: null,
+                errorCode: "NO_CONTACT_DETAILS",
                 ct);
             return;
         }
@@ -64,6 +72,7 @@ public class SendReminderConsumer(
         var result = await messagingService.SendAsync(
             cmd.Provider,
             new SendMessageRequest([recipient], content, type),
+            cmd.OrganizationId,
             ct);
         sw.Stop();
 
@@ -82,20 +91,42 @@ public class SendReminderConsumer(
 
         if (result.Success)
         {
-            await scheduledReminderRepository.MarkSentAsync(cmd.ScheduledReminderId, ct);
+            await scheduledReminderRepository.RecordDeliveryAttemptAsync(
+                cmd.ScheduledReminderId,
+                success: true,
+                retryable: false,
+                providerMessageId: result.MessageId,
+                errorCode: null,
+                ct);
             logger.LogInformation("Herinnering ({window}) verstuurd voor encounter {enc}.",
                 cmd.ReminderWindow, cmd.EncounterId);
             return;
         }
 
-        await scheduledReminderRepository.MarkFailedAsync(
+        var retryable = IsRetryableSendError(result.Error);
+        await scheduledReminderRepository.RecordDeliveryAttemptAsync(
             cmd.ScheduledReminderId,
-            "SEND_ERROR",
+            success: false,
+            retryable,
+            providerMessageId: result.MessageId,
+            errorCode: retryable ? "SEND_RETRYABLE" : "SEND_PERMANENT",
             ct);
+    }
 
-        // Gooi een exception zodat MassTransit de retry-policy triggert
-        throw new InvalidOperationException(
-            $"Versturen mislukt voor encounter {cmd.EncounterId}: {result.Error}");
+    private static bool IsRetryableSendError(string? error)
+    {
+        if (string.IsNullOrWhiteSpace(error))
+            return true;
+
+        var normalized = error.ToLowerInvariant();
+        return normalized.Contains("timeout", StringComparison.Ordinal) ||
+               normalized.Contains("temporar", StringComparison.Ordinal) ||
+               normalized.Contains("connection", StringComparison.Ordinal) ||
+               normalized.Contains("network", StringComparison.Ordinal) ||
+               normalized.Contains("token", StringComparison.Ordinal) ||
+               normalized.Contains("http 408", StringComparison.Ordinal) ||
+               normalized.Contains("http 429", StringComparison.Ordinal) ||
+               normalized.Contains("http 5", StringComparison.Ordinal);
     }
 
     private static string BuildMessage(SendReminderCommand cmd, string? templateBody)

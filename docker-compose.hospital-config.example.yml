@@ -1,0 +1,6 @@
+services:
+  api:
+    environment:
+      HospitalConfiguration__FilePath: /app/config/hospital-config.json
+    volumes:
+      - ./hospital-config.json:/app/config/hospital-config.json:ro

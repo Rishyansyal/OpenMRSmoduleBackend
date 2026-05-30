@@ -61,6 +61,8 @@ public class ReminderWorker(
                 reminder.EncounterStart,
                 reminder.ServiceType,
                 reminder.Provider,
+                reminder.AttemptCount,
+                reminder.MaxAttempts,
                 reminder.Location,
                 reminder.Instructions), ct);
 

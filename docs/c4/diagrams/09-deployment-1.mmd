@@ -1,45 +1,22 @@
 flowchart TB
-    classDef host fill:#f1f5f9,stroke:#475569,stroke-width:2px,color:#000
-    classDef network fill:#fef9c3,stroke:#a16207,stroke-width:1px,color:#000
-    classDef container fill:#dbeafe,stroke:#1e40af,stroke-width:1px,color:#000
-    classDef db fill:#fce7f3,stroke:#9d174d,stroke-width:1px,color:#000
-    classDef ext fill:#e0e7ff,stroke:#4338ca,stroke-width:1px,color:#000
-    classDef volume fill:#dcfce7,stroke:#166534,stroke-width:1px,color:#000
+    classDef host fill:#f8f9fa,stroke:#495057,color:#111
+    classDef container fill:#d0ebff,stroke:#1971c2,color:#111
+    classDef db fill:#d3f9d8,stroke:#2b8a3e,color:#111
+    classDef queue fill:#e5dbff,stroke:#5f3dc4,color:#111
+    classDef ext fill:#ffe8cc,stroke:#d9480f,color:#111
 
-    subgraph Host["💻 Developer Machine (Docker Desktop)"]
-        Browser["🌐 Browser<br/>localhost:3001"]:::ext
-
-        subgraph netFront["frontend network"]
-            FE["📦 frontend<br/>Next.js 16<br/>:3001"]:::container
-        end
-
-        subgraph netBackend["backend network (bridge)"]
-            API["📦 api<br/>ASP.NET Core 10<br/>:5111 → :8080<br/>read-only, no-new-privileges, cap_drop ALL"]:::container
-            DB[("📦 db<br/>PostgreSQL 17<br/>internal only<br/>no port binding")]:::db
-            VolPG[("💾 pgdata volume")]:::volume
-        end
-
-        subgraph netOMRS["openmrs network"]
-            GW["📦 gateway<br/>:3032 → :80"]:::container
-            OMFE["📦 openmrs-frontend"]:::container
-            OMBE["📦 openmrs-backend"]:::container
-            OMDB[("📦 mariadb 10.11")]:::db
-            VolOMRS[("💾 openmrs-data")]:::volume
-            VolDB[("💾 db-data")]:::volume
-        end
-
-        FAKE["📦 fakecomworld<br/>:1337 → :8080<br/>standalone container"]:::container
+    subgraph host["Developer machine"]
+        browser["Browser<br/>OpenMRS O3"]:::ext
+        fake["FakeComWorld<br/>localhost:1337"]:::ext
+        openmrs["OpenMRS O3 compose<br/>gateway :3032, backend, frontend, MariaDB"]:::container
+        api["OpenMRSmoduleBackend api<br/>localhost:5111"]:::container
+        pg[("PostgreSQL<br/>backend network only")]:::db
+        bus["MassTransit transport<br/>in-memory by default or RabbitMQ when configured"]:::queue
     end
 
-    Browser -->|HTTPS in prod / HTTP dev| FE
-    FE -->|fetch /api/* met JWT| API
-    API -->|TCP 5432| DB
-    DB --> VolPG
-    API -.->|HTTPS :3032| GW
-    GW --> OMFE
-    GW --> OMBE
-    OMBE --> OMDB
-    OMBE --> VolOMRS
-    OMDB --> VolDB
-    API -.->|HTTPS :1337| FAKE
-    OMBE -.->|signed webhook POST /api/webhooks/openmrs/appointments| API
+    browser --> openmrs
+    openmrs -->|"signed webhook"| api
+    api -->|"FHIR R4"| openmrs
+    api -->|"SQL"| pg
+    api -->|"publish/consume"| bus
+    api -->|"provider API"| fake

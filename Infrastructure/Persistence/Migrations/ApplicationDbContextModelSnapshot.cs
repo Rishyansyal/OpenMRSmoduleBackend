@@ -187,10 +187,53 @@ namespace OpenMRSmoduleBackend.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("default_provider");
 
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("enabled");
+
+                    b.Property<int>("MaxDeliveryAttempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_delivery_attempts");
+
+                    b.Property<string>("OpenMrsBaseUrl")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("openmrs_base_url");
+
+                    b.Property<string>("OpenMrsPasswordEncrypted")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("openmrs_password_encrypted");
+
+                    b.Property<string>("OpenMrsUsernameEncrypted")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("openmrs_username_encrypted");
+
                     b.Property<string>("OrganizationId")
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("organization_id");
+
+                    b.Property<bool>("PollerEnabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("poller_enabled");
+
+                    b.Property<int>("PollerIntervalMinutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("poller_interval_minutes");
+
+                    b.Property<int>("PollerLookaheadHours")
+                        .HasColumnType("integer")
+                        .HasColumnName("poller_lookahead_hours");
+
+                    b.Property<int>("RetryBaseDelaySeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("retry_base_delay_seconds");
+
+                    b.Property<int>("RetryMaxDelayMinutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("retry_max_delay_minutes");
 
                     b.Property<string>("TimeZoneId")
                         .IsRequired()
@@ -201,12 +244,69 @@ namespace OpenMRSmoduleBackend.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at_utc");
 
+                    b.Property<string>("WebhookSecretEncrypted")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("webhook_secret_encrypted");
+
                     b.HasKey("Id");
 
                     b.HasIndex("OrganizationId")
                         .IsUnique();
 
                     b.ToTable("organization_integration_configs", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.OrganizationProviderConfig", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("BaseUrl")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("base_url");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("CredentialsJsonEncrypted")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("credentials_json_encrypted");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("enabled");
+
+                    b.Property<string>("OrganizationId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("organization_id");
+
+                    b.Property<string>("ProviderName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("provider_name");
+
+                    b.Property<string>("StudentGroup")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("student_group");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganizationId", "ProviderName")
+                        .IsUnique();
+
+                    b.ToTable("organization_provider_configs", (string)null);
                 });
 
             modelBuilder.Entity("Domain.ReminderLog", b =>
@@ -270,6 +370,10 @@ namespace OpenMRSmoduleBackend.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("appointment_notification_id");
 
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempt_count");
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
@@ -279,9 +383,21 @@ namespace OpenMRSmoduleBackend.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("encounter_id");
 
+                    b.Property<DateTime?>("LastAttemptAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_attempt_at_utc");
+
                     b.Property<string>("LastErrorCode")
                         .HasColumnType("text")
                         .HasColumnName("last_error_code");
+
+                    b.Property<int>("MaxAttempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_attempts");
+
+                    b.Property<DateTime?>("NextAttemptAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_attempt_at_utc");
 
                     b.Property<string>("OrganizationId")
                         .IsRequired()
@@ -293,10 +409,22 @@ namespace OpenMRSmoduleBackend.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("provider");
 
+                    b.Property<string>("ProviderMessageId")
+                        .HasColumnType("text")
+                        .HasColumnName("provider_message_id");
+
                     b.Property<string>("ReminderWindow")
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("reminder_window");
+
+                    b.Property<int>("RetryBaseDelaySeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("retry_base_delay_seconds");
+
+                    b.Property<int>("RetryMaxDelayMinutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("retry_max_delay_minutes");
 
                     b.Property<DateTime>("ScheduledForUtc")
                         .HasColumnType("timestamp with time zone")
@@ -319,43 +447,11 @@ namespace OpenMRSmoduleBackend.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("AppointmentNotificationId", "ReminderWindow");
 
+                    b.HasIndex("Status", "NextAttemptAtUtc");
+
                     b.HasIndex("Status", "ScheduledForUtc");
 
                     b.ToTable("scheduled_reminders", (string)null);
-                });
-
-            modelBuilder.Entity("Domain.User", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("Email")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("email");
-
-                    b.Property<string>("EmailHash")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("email_hash");
-
-                    b.Property<string>("PasswordHash")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("password_hash");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("EmailHash")
-                        .IsUnique();
-
-                    b.ToTable("users", (string)null);
                 });
 
             modelBuilder.Entity("Domain.WebhookEventLog", b =>

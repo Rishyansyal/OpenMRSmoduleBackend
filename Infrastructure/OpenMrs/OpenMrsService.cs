@@ -2,30 +2,42 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using Application.OpenMrs;
-using Microsoft.Extensions.Options;
+using Application.Organizations;
 
 namespace Infrastructure.OpenMrs;
 
-public class OpenMrsService(IHttpClientFactory httpClientFactory, IOptions<OpenMrsOptions> options) : IOpenMrsService
+public class OpenMrsService(
+    IHttpClientFactory httpClientFactory,
+    IOrganizationConfigRepository organizationConfigs,
+    ILogger<OpenMrsService> logger) : IOpenMrsService
 {
-    private readonly OpenMrsOptions _options = options.Value;
-
-    private HttpClient CreateClient()
+    private async Task<(HttpClient Client, OrganizationRuntimeConfig Config)> CreateClientAsync(
+        string organizationId,
+        CancellationToken ct)
     {
-        var client = httpClientFactory.CreateClient();
+        var config = await organizationConfigs.GetByIdAsync(organizationId, ct)
+            ?? throw new InvalidOperationException("OpenMRS organization is not configured or is disabled.");
+
+        var client = httpClientFactory.CreateClient("openmrs");
         var credentials = Convert.ToBase64String(
-            Encoding.UTF8.GetBytes($"{_options.Username}:{_options.Password}"));
+            Encoding.UTF8.GetBytes($"{config.OpenMrsUsername}:{config.OpenMrsPassword}"));
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Basic", credentials);
         client.DefaultRequestHeaders.Accept.Add(
             new MediaTypeWithQualityHeaderValue("application/fhir+json"));
-        return client;
+        return (client, config);
     }
 
-    public async Task<IEnumerable<PatientContact>> SearchPatientsAsync(string query, CancellationToken ct = default)
+    private static string FhirBase(OrganizationRuntimeConfig config) =>
+        $"{config.OpenMrsBaseUrl.TrimEnd('/')}/openmrs/ws/fhir2/R4";
+
+    public async Task<IEnumerable<PatientContact>> SearchPatientsAsync(
+        string organizationId,
+        string query,
+        CancellationToken ct = default)
     {
-        var client = CreateClient();
-        var url = $"{_options.FhirBase}/Patient?name={Uri.EscapeDataString(query)}&_count=20";
+        var (client, config) = await CreateClientAsync(organizationId, ct);
+        var url = $"{FhirBase(config)}/Patient?name={Uri.EscapeDataString(query)}&_count=20";
         var response = await client.GetAsync(url, ct);
         response.EnsureSuccessStatusCode();
 
@@ -33,20 +45,25 @@ public class OpenMrsService(IHttpClientFactory httpClientFactory, IOptions<OpenM
         return ParsePatientBundle(doc.RootElement).ToList();
     }
 
-    public async Task<PatientContact?> GetPatientAsync(string patientId, CancellationToken ct = default)
+    public async Task<PatientContact?> GetPatientAsync(
+        string organizationId,
+        string patientId,
+        CancellationToken ct = default)
     {
-        var client = CreateClient();
-        var response = await client.GetAsync($"{_options.FhirBase}/Patient/{patientId}", ct);
+        var (client, config) = await CreateClientAsync(organizationId, ct);
+        var response = await client.GetAsync($"{FhirBase(config)}/Patient/{patientId}", ct);
         if (!response.IsSuccessStatusCode) return null;
 
         using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
         return ParsePatient(doc.RootElement);
     }
 
-    public async Task<IEnumerable<UpcomingAppointment>> GetUpcomingAppointmentsAsync(CancellationToken ct = default)
+    public async Task<IEnumerable<UpcomingAppointment>> GetUpcomingAppointmentsAsync(
+        string organizationId,
+        CancellationToken ct = default)
     {
-        var client = CreateClient();
-        var url = $"{_options.FhirBase}/Encounter?_count=50&_sort=-date";
+        var (client, config) = await CreateClientAsync(organizationId, ct);
+        var url = $"{FhirBase(config)}/Encounter?_count=50&_sort=-date";
         var response = await client.GetAsync(url, ct);
         response.EnsureSuccessStatusCode();
 
@@ -55,12 +72,15 @@ public class OpenMrsService(IHttpClientFactory httpClientFactory, IOptions<OpenM
     }
 
     public async Task<IEnumerable<UpcomingAppointment>> GetEncountersInRangeAsync(
-        DateTime from, DateTime to, CancellationToken ct = default)
+        string organizationId,
+        DateTime from,
+        DateTime to,
+        CancellationToken ct = default)
     {
-        var client = CreateClient();
+        var (client, config) = await CreateClientAsync(organizationId, ct);
         var f = from.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ");
         var t = to.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ");
-        var url = $"{_options.FhirBase}/Encounter?date=ge{f}&date=le{t}&_count=100";
+        var url = $"{FhirBase(config)}/Encounter?date=ge{f}&date=le{t}&_count=100";
         var response = await client.GetAsync(url, ct);
         response.EnsureSuccessStatusCode();
 
@@ -68,9 +88,12 @@ public class OpenMrsService(IHttpClientFactory httpClientFactory, IOptions<OpenM
         return ParseAppointmentBundle(doc.RootElement).ToList();
     }
 
-    public async Task<UpcomingAppointment> CreateVisitAsync(CreateVisitRequest request, CancellationToken ct = default)
+    public async Task<UpcomingAppointment> CreateVisitAsync(
+        string organizationId,
+        CreateVisitRequest request,
+        CancellationToken ct = default)
     {
-        var client = CreateClient();
+        var (client, config) = await CreateClientAsync(organizationId, ct);
 
         var startStr = request.StartUtc.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.000+0000");
         var visit = new Dictionary<string, object?>
@@ -85,22 +108,26 @@ public class OpenMrsService(IHttpClientFactory httpClientFactory, IOptions<OpenM
             visit["stopDatetime"] = request.EndUtc.Value.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.000+0000");
 
         var json = JsonSerializer.Serialize(visit);
-        var url = $"{_options.BaseUrl.TrimEnd('/')}/openmrs/ws/rest/v1/visit";
+        var url = $"{config.OpenMrsBaseUrl.TrimEnd('/')}/openmrs/ws/rest/v1/visit";
         using var content = new StringContent(json, Encoding.UTF8, "application/json");
         var response = await client.PostAsync(url, content, ct);
         var body = await response.Content.ReadAsStringAsync(ct);
 
         if (!response.IsSuccessStatusCode)
-            throw new InvalidOperationException(
-                $"OpenMRS POST /visit faalde ({(int)response.StatusCode}): {body}");
+        {
+            logger.LogWarning(
+                "OpenMRS visit create failed for organization {OrganizationId}: HTTP {StatusCode}. Body: {Body}",
+                organizationId,
+                (int)response.StatusCode,
+                body);
+            throw new InvalidOperationException("OpenMRS could not create the visit.");
+        }
 
         using var doc = JsonDocument.Parse(body);
         var root = doc.RootElement;
         var visitId = root.GetProperty("uuid").GetString() ?? "";
 
-        // FHIR2 mapping is meestal direct beschikbaar; haal Encounter op om
-        // de canonieke representatie (status, service-type, location-display) terug te krijgen.
-        var fetched = await GetEncounterAsync(visitId, ct);
+        var fetched = await GetEncounterAsync(client, config, visitId, ct);
         if (fetched is null)
         {
             return new UpcomingAppointment(
@@ -123,26 +150,36 @@ public class OpenMrsService(IHttpClientFactory httpClientFactory, IOptions<OpenM
         };
     }
 
-    private async Task<UpcomingAppointment?> GetEncounterAsync(string id, CancellationToken ct)
+    private async Task<UpcomingAppointment?> GetEncounterAsync(
+        HttpClient client,
+        OrganizationRuntimeConfig config,
+        string id,
+        CancellationToken ct)
     {
-        var client = CreateClient();
-        var response = await client.GetAsync($"{_options.FhirBase}/Encounter/{id}", ct);
+        var response = await client.GetAsync($"{FhirBase(config)}/Encounter/{id}", ct);
         if (!response.IsSuccessStatusCode) return null;
 
         using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
         return ParseAppointment(doc.RootElement);
     }
 
-    public async Task<IEnumerable<OpenMrsReferenceItem>> GetVisitTypesAsync(CancellationToken ct = default) =>
-        await GetReferenceListAsync("visittype", ct);
+    public async Task<IEnumerable<OpenMrsReferenceItem>> GetVisitTypesAsync(
+        string organizationId,
+        CancellationToken ct = default) =>
+        await GetReferenceListAsync(organizationId, "visittype", ct);
 
-    public async Task<IEnumerable<OpenMrsReferenceItem>> GetLocationsAsync(CancellationToken ct = default) =>
-        await GetReferenceListAsync("location", ct);
+    public async Task<IEnumerable<OpenMrsReferenceItem>> GetLocationsAsync(
+        string organizationId,
+        CancellationToken ct = default) =>
+        await GetReferenceListAsync(organizationId, "location", ct);
 
-    private async Task<IEnumerable<OpenMrsReferenceItem>> GetReferenceListAsync(string resource, CancellationToken ct)
+    private async Task<IEnumerable<OpenMrsReferenceItem>> GetReferenceListAsync(
+        string organizationId,
+        string resource,
+        CancellationToken ct)
     {
-        var client = CreateClient();
-        var url = $"{_options.BaseUrl.TrimEnd('/')}/openmrs/ws/rest/v1/{resource}?v=default";
+        var (client, config) = await CreateClientAsync(organizationId, ct);
+        var url = $"{config.OpenMrsBaseUrl.TrimEnd('/')}/openmrs/ws/rest/v1/{resource}?v=default";
         var response = await client.GetAsync(url, ct);
         response.EnsureSuccessStatusCode();
 
@@ -159,8 +196,6 @@ public class OpenMrsService(IHttpClientFactory httpClientFactory, IOptions<OpenM
         }
         return items;
     }
-
-    // --- FHIR parsers ---
 
     private static IEnumerable<PatientContact> ParsePatientBundle(JsonElement bundle)
     {
@@ -203,7 +238,6 @@ public class OpenMrsService(IHttpClientFactory httpClientFactory, IOptions<OpenM
                 var value = t.TryGetProperty("value", out var v) ? v.GetString() : null;
                 if (string.IsNullOrWhiteSpace(value)) continue;
 
-                // OpenMRS FHIR2 retourneert telecom soms zonder system — heuristisch raden.
                 if (string.IsNullOrEmpty(system))
                     system = value.Contains('@') ? "email" : "phone";
 
@@ -232,7 +266,6 @@ public class OpenMrsService(IHttpClientFactory httpClientFactory, IOptions<OpenM
         var id = idEl.GetString() ?? "";
         var status = resource.TryGetProperty("status", out var s) ? s.GetString() ?? "" : "";
 
-        // Encounter gebruikt period.start i.p.v. start
         DateTime start = DateTime.MinValue;
         DateTime? end = null;
         if (resource.TryGetProperty("period", out var period))
@@ -245,7 +278,6 @@ public class OpenMrsService(IHttpClientFactory httpClientFactory, IOptions<OpenM
         }
         if (start == DateTime.MinValue) return null;
 
-        // Encounter gebruikt subject i.p.v. participant[].actor
         string patientId = "", patientDisplay = "";
         if (resource.TryGetProperty("subject", out var subject))
         {
@@ -255,7 +287,6 @@ public class OpenMrsService(IHttpClientFactory httpClientFactory, IOptions<OpenM
             patientDisplay = subject.TryGetProperty("display", out var d) ? d.GetString() ?? "" : "";
         }
 
-        // Encounter type → type[0].coding[0].display of type[0].text
         string? serviceType = null;
         if (resource.TryGetProperty("type", out var types) && types.GetArrayLength() > 0)
         {
@@ -266,7 +297,6 @@ public class OpenMrsService(IHttpClientFactory httpClientFactory, IOptions<OpenM
                 serviceType = coding[0].TryGetProperty("display", out var cd) ? cd.GetString() : null;
         }
 
-        // Encounter.location[0].location.display
         string? location = null;
         if (resource.TryGetProperty("location", out var locations) && locations.GetArrayLength() > 0)
         {

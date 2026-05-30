@@ -1,3 +1,4 @@
+using System.Data;
 using Application.Reminders;
 using Application.Security;
 using Domain;
@@ -16,12 +17,15 @@ public class ScheduledReminderRepository(
         CancellationToken ct = default)
     {
         var staleQueuedCutoff = nowUtc.AddMinutes(-15);
+        await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
         var reminders = await db.ScheduledReminders
             .Include(r => r.AppointmentNotification)
             .Where(r =>
                 r.ScheduledForUtc <= nowUtc &&
                 (r.Status == ScheduledReminderStatus.Pending ||
-                 (r.Status == ScheduledReminderStatus.Queued && r.UpdatedAtUtc < staleQueuedCutoff)) &&
+                 (r.Status == ScheduledReminderStatus.RetryWait && r.NextAttemptAtUtc <= nowUtc) ||
+                 (r.Status == ScheduledReminderStatus.Queued && r.UpdatedAtUtc < staleQueuedCutoff) ||
+                 (r.Status == ScheduledReminderStatus.Sending && r.UpdatedAtUtc < staleQueuedCutoff)) &&
                 r.AppointmentNotification != null &&
                 !r.AppointmentNotification.IsCancelled)
             .OrderBy(r => r.ScheduledForUtc)
@@ -36,6 +40,7 @@ public class ScheduledReminderRepository(
         }
 
         await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
 
         return reminders.Select(r =>
         {
@@ -49,6 +54,8 @@ public class ScheduledReminderRepository(
                 appointment.StartUtc,
                 encryption.DecryptNullable(appointment.ServiceTypeEncrypted),
                 r.Provider,
+                r.AttemptCount,
+                r.MaxAttempts,
                 encryption.DecryptNullable(appointment.LocationEncrypted),
                 encryption.DecryptNullable(appointment.InstructionsEncrypted));
         }).ToList();
@@ -77,6 +84,71 @@ public class ScheduledReminderRepository(
         await db.SaveChangesAsync(ct);
     }
 
+    public async Task MarkSendingAsync(Guid scheduledReminderId, CancellationToken ct = default)
+    {
+        var reminder = await db.ScheduledReminders.SingleOrDefaultAsync(r => r.Id == scheduledReminderId, ct);
+        if (reminder is null) return;
+
+        reminder.Status = ScheduledReminderStatus.Sending;
+        reminder.LastAttemptAtUtc = DateTime.UtcNow;
+        reminder.UpdatedAtUtc = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+    }
+
+    public async Task RecordDeliveryAttemptAsync(
+        Guid scheduledReminderId,
+        bool success,
+        bool retryable,
+        string? providerMessageId,
+        string? errorCode,
+        CancellationToken ct = default)
+    {
+        var reminder = await db.ScheduledReminders.SingleOrDefaultAsync(r => r.Id == scheduledReminderId, ct);
+        if (reminder is null) return;
+
+        var now = DateTime.UtcNow;
+        reminder.AttemptCount++;
+        reminder.LastAttemptAtUtc = now;
+        reminder.ProviderMessageId = providerMessageId ?? reminder.ProviderMessageId;
+        reminder.LastErrorCode = errorCode;
+        reminder.UpdatedAtUtc = now;
+
+        if (success)
+        {
+            reminder.Status = ScheduledReminderStatus.Sent;
+            reminder.SentAtUtc = now;
+            reminder.NextAttemptAtUtc = null;
+        }
+        else if (!retryable)
+        {
+            reminder.Status = ScheduledReminderStatus.FailedPermanent;
+            reminder.NextAttemptAtUtc = null;
+        }
+        else if (reminder.AttemptCount >= reminder.MaxAttempts)
+        {
+            reminder.Status = ScheduledReminderStatus.DeadLettered;
+            reminder.NextAttemptAtUtc = null;
+        }
+        else
+        {
+            reminder.Status = ScheduledReminderStatus.RetryWait;
+            reminder.NextAttemptAtUtc = now.Add(ComputeBackoff(reminder));
+        }
+
+        await db.SaveChangesAsync(ct);
+    }
+
+    public async Task RetryNowAsync(Guid scheduledReminderId, CancellationToken ct = default)
+    {
+        var reminder = await db.ScheduledReminders.SingleOrDefaultAsync(r => r.Id == scheduledReminderId, ct);
+        if (reminder is null) return;
+
+        reminder.Status = ScheduledReminderStatus.Pending;
+        reminder.NextAttemptAtUtc = DateTime.UtcNow;
+        reminder.UpdatedAtUtc = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+    }
+
     public async Task<IReadOnlyList<ScheduledReminderOverview>> GetRecentAsync(
         int count = 50,
         CancellationToken ct = default) =>
@@ -94,6 +166,21 @@ public class ScheduledReminderRepository(
                 r.Provider,
                 r.Status,
                 r.AppointmentNotification != null && r.AppointmentNotification.IsCancelled,
-                r.LastErrorCode))
+                r.LastErrorCode,
+                r.AttemptCount,
+                r.MaxAttempts,
+                r.LastAttemptAtUtc,
+                r.NextAttemptAtUtc,
+                r.ProviderMessageId))
             .ToListAsync(ct);
+
+    private static TimeSpan ComputeBackoff(ScheduledReminder reminder)
+    {
+        var exponentialSeconds = reminder.RetryBaseDelaySeconds *
+                                 Math.Pow(2, Math.Max(0, reminder.AttemptCount - 1));
+        var cappedSeconds = Math.Min(
+            exponentialSeconds,
+            TimeSpan.FromMinutes(reminder.RetryMaxDelayMinutes).TotalSeconds);
+        return TimeSpan.FromSeconds(Math.Max(reminder.RetryBaseDelaySeconds, cappedSeconds));
+    }
 }

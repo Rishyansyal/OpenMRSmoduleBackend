@@ -9,5 +9,7 @@ public record SendReminderCommand(
     DateTime EncounterStart,
     string? ServiceType,
     string Provider,
+    int AttemptCount,
+    int MaxAttempts,
     string? Location = null,
     string? Instructions = null);

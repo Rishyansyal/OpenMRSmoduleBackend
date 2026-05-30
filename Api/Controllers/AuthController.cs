@@ -1,20 +1,32 @@
 using Application.Auth;
+using Infrastructure.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Options;
 using System.Security.Claims;
 
 namespace Api.Controllers;
 
 [ApiController]
 [Route("[controller]")]
-public class AuthController(IAuthService authService, ILogger<AuthController> logger) : ControllerBase
+public class AuthController(
+    IAuthService authService,
+    IOptions<AdminBootstrapOptions> adminOptions,
+    ILogger<AuthController> logger) : ControllerBase
 {
     [AllowAnonymous]
     [EnableRateLimiting("AuthPolicy")]
     [HttpPost("register")]
     public async Task<IActionResult> Register(RegisterRequest request, CancellationToken ct)
     {
+        if (!adminOptions.Value.AllowPublicRegistration)
+            return StatusCode(StatusCodes.Status403Forbidden, new
+            {
+                error = "PUBLIC_REGISTRATION_DISABLED",
+                message = "Public registration is disabled. Use the bootstrapped admin account."
+            });
+
         try
         {
             var result = await authService.RegisterAsync(request, ct);
