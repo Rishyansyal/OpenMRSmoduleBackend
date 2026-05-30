@@ -54,8 +54,16 @@ public class AuthService(
 
     private async Task<AuthResult> GenerateTokenAsync(IdentityUser user)
     {
-        var secretKey = configuration["Jwt:SecretKey"]
-            ?? throw new InvalidOperationException("Jwt:SecretKey is not configured.");
+        var secretKey = configuration["Jwt:SecretKey"];
+        if (string.IsNullOrWhiteSpace(secretKey))
+        {
+            secretKey = configuration["JWT_SECRET"];
+        }
+
+        if (string.IsNullOrWhiteSpace(secretKey))
+        {
+            throw new InvalidOperationException("Jwt:SecretKey or JWT_SECRET is not configured.");
+        }
 
         if (secretKey.Length < 32)
             throw new InvalidOperationException(

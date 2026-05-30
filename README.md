@@ -54,7 +54,7 @@ Minimum required values:
 | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | PostgreSQL credentials and database name. |
 | `JWT_SECRET` | JWT signing secret, at least 32 characters. |
 | `SECURITY_ENCRYPTION_KEY`, `ENCRYPTION_KEY` | Base64 32-byte AES-GCM keys. |
-| `OPENMRS_BASE_URL`, `OPENMRS_USERNAME`, `OPENMRS_PASSWORD` | Legacy single-organization OpenMRS connection used when JSON hospital config is absent. |
+| `OPENMRS_ORGANIZATION_ID`, `OPENMRS_BASE_URL`, `OPENMRS_USERNAME`, `OPENMRS_PASSWORD` | Legacy single-organization OpenMRS identity and connection used when JSON hospital config is absent. The id must match OpenMRS `OPENMRS_WEBHOOK_ORGANIZATION_ID`. |
 | `OPENMRS_WEBHOOK_SECRET` | Legacy single-organization webhook secret. |
 | `MESSAGING_STUDENT_GROUP`, `MESSAGING_*` | Provider credentials for FakeComWorld. |
 | `RABBITMQ_HOST`, `RABBITMQ_USERNAME`, `RABBITMQ_PASSWORD` | Required for RabbitMQ transport. Leave host empty only for local in-memory transport. |

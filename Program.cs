@@ -35,6 +35,25 @@ using Microsoft.IdentityModel.Tokens;
 using Application.Webhooks;
 using Microsoft.OpenApi;
 
+// Load .env file for local development
+var envPath = Path.Combine(Directory.GetCurrentDirectory(), ".env");
+if (File.Exists(envPath))
+{
+    foreach (var line in File.ReadAllLines(envPath))
+    {
+        if (string.IsNullOrWhiteSpace(line) || line.StartsWith('#')) continue;
+        var parts = line.Split('=', 2);
+        if (parts.Length != 2) continue;
+        var key = parts[0].Trim();
+        var value = parts[1].Trim();
+        Environment.SetEnvironmentVariable(key, value);
+        if (key == "JWT_SECRET")
+        {
+            Environment.SetEnvironmentVariable("Jwt__SecretKey", value);
+        }
+    }
+}
+
 var builder = WebApplication.CreateBuilder(args);
 
 var hospitalConfigPath = builder.Configuration["HospitalConfiguration:FilePath"];
@@ -58,9 +77,17 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
     ?? throw new InvalidOperationException(
         "ConnectionStrings:DefaultConnection is not configured.");
 
-var jwtSecret = builder.Configuration["Jwt:SecretKey"]
-    ?? throw new InvalidOperationException(
-        "Jwt:SecretKey is not configured. Set via env var Jwt__SecretKey.");
+var jwtSecret = builder.Configuration["Jwt:SecretKey"];
+if (string.IsNullOrWhiteSpace(jwtSecret))
+{
+    jwtSecret = builder.Configuration["JWT_SECRET"];
+}
+
+if (string.IsNullOrWhiteSpace(jwtSecret))
+{
+    throw new InvalidOperationException(
+        "JWT Secret is not configured. Set Jwt:SecretKey in configuration, or Jwt__SecretKey / JWT_SECRET in environment/dotenv.");
+}
 
 if (jwtSecret.Length < 32)
     throw new InvalidOperationException(

@@ -65,7 +65,7 @@ namespace OpenMRSmoduleBackend.Infrastructure.Persistence.Migrations
                 table: "organization_integration_configs",
                 type: "boolean",
                 nullable: false,
-                defaultValue: true);
+                defaultValue: false);
 
             migrationBuilder.AddColumn<int>(
                 name: "max_delivery_attempts",

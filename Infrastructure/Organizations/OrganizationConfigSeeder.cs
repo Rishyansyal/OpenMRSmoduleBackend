@@ -12,8 +12,11 @@ public class OrganizationConfigSeeder(
     ApplicationDbContext db,
     IFieldEncryptionService encryption,
     IConfiguration configuration,
-    IOptions<HospitalConfigurationOptions> options)
+    IOptions<HospitalConfigurationOptions> options,
+    ILogger<OrganizationConfigSeeder> logger)
 {
+    private const string EncryptedFieldPrefix = "v1:";
+
     public async Task SeedAsync(CancellationToken ct = default)
     {
         var organizations = options.Value.Organizations.Count > 0
@@ -27,11 +30,14 @@ public class OrganizationConfigSeeder(
                 await UpsertProviderAsync(organization.OrganizationId, provider, ct);
         }
 
+        await DisableIncompleteLegacyConfigsAsync(ct);
         await db.SaveChangesAsync(ct);
     }
 
     private async Task UpsertOrganizationAsync(HospitalOrganizationOptions source, CancellationToken ct)
     {
+        ValidateOrganization(source);
+
         var organization = await db.OrganizationIntegrationConfigs
             .SingleOrDefaultAsync(o => o.OrganizationId == source.OrganizationId, ct);
 
@@ -65,6 +71,8 @@ public class OrganizationConfigSeeder(
         HospitalProviderOptions source,
         CancellationToken ct)
     {
+        ValidateProvider(organizationId, source);
+
         var providerName = source.ProviderName.ToLowerInvariant();
         var provider = await db.OrganizationProviderConfigs
             .SingleOrDefaultAsync(
@@ -88,11 +96,68 @@ public class OrganizationConfigSeeder(
         provider.UpdatedAtUtc = DateTime.UtcNow;
     }
 
+    private async Task DisableIncompleteLegacyConfigsAsync(CancellationToken ct)
+    {
+        var organizations = await db.OrganizationIntegrationConfigs.ToListAsync(ct);
+        foreach (var organization in organizations.Where(o =>
+                     !IsEncrypted(o.OpenMrsUsernameEncrypted) ||
+                     !IsEncrypted(o.OpenMrsPasswordEncrypted) ||
+                     !IsEncrypted(o.WebhookSecretEncrypted)))
+        {
+            organization.Enabled = false;
+            organization.PollerEnabled = false;
+            organization.UpdatedAtUtc = DateTime.UtcNow;
+            logger.LogWarning(
+                "Disabled incomplete organization config {OrganizationId}. Reseed it from environment variables or mounted hospital configuration.",
+                organization.OrganizationId);
+        }
+
+        var providers = await db.OrganizationProviderConfigs.ToListAsync(ct);
+        foreach (var provider in providers.Where(p => !IsEncrypted(p.CredentialsJsonEncrypted)))
+        {
+            provider.Enabled = false;
+            provider.UpdatedAtUtc = DateTime.UtcNow;
+            logger.LogWarning(
+                "Disabled incomplete provider config {ProviderName} for organization {OrganizationId}. Reseed it from environment variables or mounted hospital configuration.",
+                provider.ProviderName,
+                provider.OrganizationId);
+        }
+    }
+
+    private static bool IsEncrypted(string value) =>
+        value.StartsWith(EncryptedFieldPrefix, StringComparison.Ordinal);
+
+    private static void ValidateOrganization(HospitalOrganizationOptions source)
+    {
+        if (string.IsNullOrWhiteSpace(source.OrganizationId) ||
+            string.IsNullOrWhiteSpace(source.OpenMrsBaseUrl) ||
+            string.IsNullOrWhiteSpace(source.OpenMrsUsername) ||
+            string.IsNullOrWhiteSpace(source.OpenMrsPassword) ||
+            string.IsNullOrWhiteSpace(source.WebhookSecret))
+        {
+            throw new InvalidOperationException(
+                $"Organization '{source.OrganizationId}' must configure OrganizationId, OpenMrsBaseUrl, OpenMrsUsername, OpenMrsPassword and WebhookSecret.");
+        }
+    }
+
+    private static void ValidateProvider(string organizationId, HospitalProviderOptions source)
+    {
+        if (string.IsNullOrWhiteSpace(source.ProviderName) ||
+            string.IsNullOrWhiteSpace(source.BaseUrl) ||
+            source.Enabled && (string.IsNullOrWhiteSpace(source.StudentGroup) ||
+                               source.Credentials.Count == 0 ||
+                               source.Credentials.Values.Any(string.IsNullOrWhiteSpace)))
+        {
+            throw new InvalidOperationException(
+                $"Enabled provider '{source.ProviderName}' for organization '{organizationId}' must configure ProviderName, BaseUrl, StudentGroup and non-empty credentials.");
+        }
+    }
+
     private List<HospitalOrganizationOptions> BuildLegacyOrganizationOptions()
     {
         var organizationId =
-            configuration["OpenMrs:Poller:OrganizationId"] ??
             configuration["OpenMrs:OrganizationId"] ??
+            configuration["OpenMrs:Poller:OrganizationId"] ??
             "openmrs-local";
 
         var openMrsBaseUrl = configuration["OpenMrs:BaseUrl"] ?? "";
@@ -156,7 +221,10 @@ public class OrganizationConfigSeeder(
         new()
         {
             ProviderName = name,
-            Enabled = true,
+            Enabled = !string.IsNullOrWhiteSpace(baseUrl) &&
+                      !string.IsNullOrWhiteSpace(studentGroup) &&
+                      credentials.Count > 0 &&
+                      credentials.Values.All(value => !string.IsNullOrWhiteSpace(value)),
             BaseUrl = baseUrl,
             StudentGroup = studentGroup,
             Credentials = credentials
