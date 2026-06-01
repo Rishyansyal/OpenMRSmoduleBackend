@@ -1,29 +1,29 @@
 # Test Report
 
-Laatste update: 2026-05-23
+Last updated: 2026-05-30
 
-| Laag | Testset | Status |
+| Layer | Test set | Result |
 |---|---|---|
-| Backend unit | HMAC, encryptie, webhook scheduling | Lokaal geslaagd: 8 tests |
-| Backend integration | `WebApplicationFactory`, SQLite temp DB, health/db, auth, signed webhook, idempotency, reminders API | Lokaal geslaagd: 4 tests |
-| Frontend unit | Vitest + Testing Library | Lokaal geslaagd: 4 tests |
-| Frontend e2e | Playwright smoke | Lokaal geslaagd: 1 Chromium smoke test |
-| OpenMRS module | Maven/JUnit | Tests toegevoegd; lokaal geblokkeerd door ontbrekende Maven-installatie |
-| Full OpenMRS runtime | Handmatige acceptatietest | Niet standaard in CI |
+| Backend | Unit and `WebApplicationFactory` integration tests | Passed locally: 35 tests |
+| Swagger | Bearer security definition contract test | Passed locally |
+| Retry ledger | Retry wait and dead-letter state transitions | Passed locally |
+| Documentation | Mermaid source render through Kroki | PNG exports regenerated |
+| OpenMRS webhook module | Maven/JUnit | Passed locally: 5 tests |
+| OpenMRS distro package | Maven distro build and OMOD inspection | Passed locally |
+| Compose configuration | Backend, hospital JSON overlay, and OpenMRS config parse | Passed locally with temporary secrets |
+| Full Docker runtime | OpenMRS O3, RabbitMQ, backend, provider outage recovery | Blocked locally because Docker Desktop is not running |
 
-## Bekende verificatiebeperking
+## Commands Run
 
-Docker Desktop draait niet en Maven is niet geinstalleerd. Docker build, Docker Compose startup en OpenMRS Maven tests zijn daarom lokaal nog niet uitgevoerd. De CI-configuratie gebruikt expliciet .NET 10 en Java 21.
+```bash
+dotnet build OpenMRSmoduleBackend.csproj --no-restore
+dotnet test OpenMRSmoduleBackend.Tests/OpenMRSmoduleBackend.Tests.csproj --no-restore
+git diff --check
 
-## Lokaal uitgevoerde commands
+cd ../2.4-LU1-openMRS-Avans
+mvn -pl openmrs-webhook-module test
+mvn -P distro install -DskipTests
+docker compose config --quiet
+```
 
-- `dotnet restore .\OpenMRSmoduleBackend.Tests\OpenMRSmoduleBackend.Tests.csproj`
-- `dotnet build .\OpenMRSmoduleBackend.Tests\OpenMRSmoduleBackend.Tests.csproj --no-restore`
-- `dotnet test .\OpenMRSmoduleBackend.Tests\OpenMRSmoduleBackend.Tests.csproj --no-build` (`12/12` backend tests geslaagd)
-- `dotnet tool restore`
-- `dotnet ef migrations list --no-build`
-- `npm run test`
-- `npm run lint`
-- `npm run build`
-- `npx playwright install chromium`
-- `npm run e2e`
+The full runtime acceptance pass remains required on a machine with Docker Desktop running.

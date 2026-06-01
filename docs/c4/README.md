@@ -1,53 +1,62 @@
-# Architectuurdiagrammen — OpenMRS Communicatiemodule
+# C4 Architecture Diagrams
 
-Alle diagrammen zijn geschreven in [Mermaid](https://mermaid.js.org/) en renderen direct op GitHub.
-Naast de markdown-bron zijn er ook **PNG-exports** beschikbaar in [images/](images/) — handig voor PDF/slide-export, offline gebruik of inclusie in andere documenten.
+These diagrams describe the backend and OpenMRS O3 architecture only. The previous custom Next.js frontend is no longer part of the system.
 
-## C4-model
+Mermaid sources live in [diagrams/](diagrams/). PNG exports, when generated, live in [images/](images/).
 
-Het C4-model beschrijft de architectuur op vier zoom-niveaus.
+| Diagram | Markdown | Mermaid source | PNG |
+|---|---|---|---|
+| System context | [01-context.md](01-context.md) | [01-context.mmd](diagrams/01-context.mmd) | [01-context.png](images/01-context.png) |
+| Containers | [02-containers.md](02-containers.md) | [02-containers.mmd](diagrams/02-containers.mmd) | [02-containers.png](images/02-containers.png) |
+| Durable delivery and retry | [10-durable-delivery-retry.md](10-durable-delivery-retry.md) | [10-durable-delivery-retry.mmd](diagrams/10-durable-delivery-retry.mmd) | [10-durable-delivery-retry.png](images/10-durable-delivery-retry.png) |
+| Multi-OpenMRS configuration | [11-multi-openmrs-config.md](11-multi-openmrs-config.md) | [11-multi-openmrs-config.mmd](diagrams/11-multi-openmrs-config.mmd) | [11-multi-openmrs-config.png](images/11-multi-openmrs-config.png) |
+| Webhook authentication flow | [12-webhook-auth-flow.md](12-webhook-auth-flow.md) | [12-webhook-auth-flow.mmd](diagrams/12-webhook-auth-flow.mmd) | [12-webhook-auth-flow.png](images/12-webhook-auth-flow.png) |
+| Deployment | [09-deployment.md](09-deployment.md) | [09-deployment-1.mmd](diagrams/09-deployment-1.mmd), [09-deployment-2.mmd](diagrams/09-deployment-2.mmd) | [dev](images/09-deployment-1.png), [prod](images/09-deployment-2.png) |
+| ER model | [08-er-diagram.md](08-er-diagram.md) | [08-er-diagram.mmd](diagrams/08-er-diagram.mmd) | [08-er-diagram.png](images/08-er-diagram.png) |
 
-| Diagram | Beschrijving | PNG |
-|---|---|---|
-| [Level 1 — Context](01-context.md) | Het systeem in zijn bredere omgeving (zorgmedewerker, patiënt, OpenMRS, messaging providers) | [01-context.png](images/01-context.png) |
-| [Level 2 — Containers](02-containers.md) | De technische bouwstenen: frontend, backend API, database, message bus | [02-containers.png](images/02-containers.png) |
-| [Level 3 — Componenten](03-components.md) | Interne structuur van de backend per architectuurlaag (sync request-flow + async background-flow) | [request](images/03-components-1.png) · [background](images/03-components-2.png) |
-| [Procesdiagram — Herinneringen](04-reminder-process.md) | Sequence van webhook → consumer → patiënt, inclusief handmatige trigger en data-retentie | [1](images/04-reminder-process-1.png) · [2](images/04-reminder-process-2.png) · [3](images/04-reminder-process-3.png) |
-| [Klassediagram](05-class-diagram.md) | UML class diagrams van Domain en Application layer | [1](images/05-class-diagram-1.png) · [2](images/05-class-diagram-2.png) · [3](images/05-class-diagram-3.png) · [4](images/05-class-diagram-4.png) |
+Additional current views:
 
-## Aanvullende diagrammen
+- [Backend components](03-components.md)
+- [Reminder process](04-reminder-process.md)
+- [Core class relationships](05-class-diagram.md)
+- [Use cases](06-use-case.md)
+- [API and OpenMRS O3 flows](07-user-flow.md)
 
-| Diagram | Beschrijving | PNG |
-|---|---|---|
-| [Use case](06-use-case.md) | Actors en use cases voor zorgmedewerker, patiënt, ontwikkelaar en externe systemen | [06-use-case.png](images/06-use-case.png) |
-| [User flow](07-user-flow.md) | Globale navigatie + 4 detail-flows: bericht versturen, patiënt zoeken, geschiedenis, login | [globaal](images/07-user-flow-1.png) · [bericht](images/07-user-flow-2.png) · [patient](images/07-user-flow-3.png) · [historie](images/07-user-flow-4.png) · [login](images/07-user-flow-5.png) |
-| [ER-diagram](08-er-diagram.md) | PostgreSQL-schema: entiteiten, kolommen, encryptie, relaties, indices | [08-er-diagram.png](images/08-er-diagram.png) |
-| [Deployment](09-deployment.md) | Docker Compose layout (dev) en productie target-architectuur met security-eisen | [dev](images/09-deployment-1.png) · [prod](images/09-deployment-2.png) |
+## Regenerate PNG Exports
 
-## PNG-export regenereren
+From `OpenMRSmoduleBackend/docs/c4`:
 
-De PNG's worden lokaal gegenereerd uit de mermaid-blocks in de markdown-bron.
+```powershell
+$files = @(
+  "01-context",
+  "02-containers",
+  "10-durable-delivery-retry",
+  "11-multi-openmrs-config",
+  "12-webhook-auth-flow",
+  "09-deployment-1",
+  "09-deployment-2",
+  "08-er-diagram"
+)
 
-```bash
-# 1. Install mermaid-cli (eenmalig)
-npm install -g @mermaid-js/mermaid-cli
-
-# 2. Extract mermaid blocks naar .mmd files
-cd docs/c4
-python3 -c "
-import re
-from pathlib import Path
-for md in sorted(Path('.').glob('0*.md')):
-    blocks = re.findall(r'\`\`\`mermaid\n(.*?)\n\`\`\`', md.read_text(), re.DOTALL)
-    for i, b in enumerate(blocks, 1):
-        suffix = '' if len(blocks) == 1 else f'-{i}'
-        Path('diagrams', f'{md.stem}{suffix}.mmd').write_text(b)
-"
-
-# 3. Render naar PNG
-for f in diagrams/*.mmd; do
-    mmdc -i \"\$f\" -o \"images/\$(basename \${f%.mmd}).png\" -w 2400 -t default -b white
-done
+foreach ($name in $files) {
+  npx -y @mermaid-js/mermaid-cli -i "diagrams/$name.mmd" -o "images/$name.png" -w 2400 -b white
+}
 ```
 
-> **Tip:** Houd de mermaid-bron in de markdown bestanden als single source of truth. PNG's zijn afgeleid en moeten na elke wijziging opnieuw worden gegenereerd.
+If `mmdc` is installed globally, replace `npx -y @mermaid-js/mermaid-cli` with `mmdc`.
+
+When Mermaid CLI is unavailable, render through Kroki:
+
+```powershell
+$ErrorActionPreference = "Stop"
+Get-ChildItem "diagrams/*.mmd" | ForEach-Object {
+  $out = Join-Path "images" ($_.BaseName + ".png")
+  Invoke-WebRequest -Uri "https://kroki.io/mermaid/png" `
+    -Method Post `
+    -ContentType "text/plain" `
+    -Body ([System.IO.File]::ReadAllText($_.FullName)) `
+    -OutFile $out
+}
+```
+
+The PNG exports in this directory were regenerated from the checked-in Mermaid sources on 2026-05-30 using the Kroki command.

@@ -4,16 +4,7 @@ sequenceDiagram
     participant S as DataRetentionService
     participant DB as PostgreSQL
 
-    loop Elke 24 uur
-        W->>S: RunAsync()
-        S->>DB: DELETE FROM appointment_notifications WHERE start_utc < now - 14 dagen
-        DB-->>S: A records verwijderd
-        S->>DB: DELETE FROM reminder_logs WHERE encounter_start < now - 14 dagen
-        DB-->>S: N records verwijderd
-        S->>DB: DELETE FROM message_logs WHERE sent_at < now - 365 dagen
-        DB-->>S: M records verwijderd
-        S->>DB: DELETE FROM webhook_event_logs WHERE received_at_utc < now - 365 dagen
-        DB-->>S: W records verwijderd
-        S-->>W: DataRetentionResult(N, M, A, W)
-        W->>W: LogInformation(resultaat)
-    end
+    W->>S: RunAsync()
+    S->>DB: Delete appointment/reminder patient data older than 14 days
+    S->>DB: Delete message/webhook metadata older than 365 days
+    S-->>W: DataRetentionResult

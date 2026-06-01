@@ -1,81 +1,75 @@
-# Procesdiagram — Afspraakherinnering Flow
+# Reminder Process
 
-Stap-voor-stap weergave van hoe een afspraakherinnering van OpenMRS naar de patiënt gaat.
-
-## Webhook en automatische flow
+## Webhook To Durable Reminder State
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant OM as OpenMRS webhookmodule
-    participant API as OpenMrsWebhooksController
-    participant WS as OpenMrsWebhookService
-    participant W as ReminderWorker
-    participant O as OpenMRS FHIR API
+    participant OM as OpenMRS O3
+    participant API as Webhook Controller
+    participant CFG as Org Config
+    participant SVC as Webhook Service
     participant DB as PostgreSQL
-    participant B as MassTransit Bus
+
+    OM->>API: POST appointment event + org id + timestamp + HMAC
+    API->>CFG: Resolve enabled organization
+    API->>API: Validate timestamp and HMAC
+    API->>SVC: Process appointment event
+    SVC->>DB: Deduplicate event id
+    SVC->>DB: Upsert encrypted appointment notification
+    SVC->>DB: Create/cancel 24h and 1h scheduled reminders
+    SVC->>DB: Store selected organization default provider
+    API-->>OM: 200 OK accepted or duplicate
+```
+
+## Durable Delivery And Retry
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant W as ReminderWorker
+    participant DB as PostgreSQL retry ledger
+    participant MQ as RabbitMQ / MassTransit
     participant C as SendReminderConsumer
-    participant P as Messaging Provider
-    participant Pat as Patiënt
+    participant OM as OpenMRS FHIR
+    participant P as Configured Provider
 
-    OM->>API: POST /api/webhooks/openmrs/appointments + HMAC headers
-    API->>API: Validate HMAC, timestamp, required headers
-    API->>WS: ProcessAppointmentAsync(event, payload)
-    WS->>DB: Upsert appointment_notifications (encrypted fields)
-    WS->>DB: Insert webhook_event_logs (payload hash)
-    WS->>DB: Create/cancel scheduled_reminders (24h en 1h)
-
-    loop Elke 5 minuten
-        W->>DB: Claim due scheduled_reminders
-        DB-->>W: Reminder dispatch records
-        loop Per due reminder
-            W->>B: Publish SendReminderCommand
-        end
-    end
-
-    B->>C: Deliver SendReminderCommand
-    C->>DB: AlreadySentAsync(encounterId, window)? [idempotentie]
-    DB-->>C: false
-
-    C->>O: GET /Patient/{patientId}
-    O-->>C: PatientContact (telefoon, e-mail)
-
-    alt Patiënt heeft contactgegevens
-        C->>P: SendAsync(provider, recipient, content, type)
-        P-->>C: SendMessageResult (success, messageId)
-        C->>DB: LogAsync(ReminderLog)
-
-        alt Versturen mislukt
-            C-->>B: throw Exception
-            B->>C: Retry (3x met backoff)
-            Note over B,C: Na 3 pogingen → dead-letter queue
-        else Versturen geslaagd
-            C-->>Pat: SMS of e-mail ontvangen
-        end
-    else Geen contactgegevens
-        C->>DB: Mark scheduled reminder failed (NO_CONTACT_DETAILS)
+    W->>DB: Claim due or retry-ready scheduled reminders
+    DB-->>W: Dispatch records
+    W->>MQ: Publish SendReminderCommand
+    MQ->>C: Deliver command
+    C->>DB: Check reminder idempotency
+    C->>OM: Get patient contact
+    C->>P: Send message through configured provider
+    alt Success
+        C->>DB: Mark sent, store provider message id, log success
+    else Transient failure
+        C->>DB: Increment attempt_count, set last_error_code and next_attempt_at_utc
+        C-->>MQ: Throw for MassTransit retry/dead-letter behavior
+    else Permanent failure or max attempts
+        C->>DB: Mark failed/dead_lettered and log failure
     end
 ```
 
-## Handmatige trigger (voor testen)
+No automatic provider fallback occurs. Retries target the same provider selected by organization configuration unless an operator changes configuration and intentionally requeues work.
+
+## Manual Trigger
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Dev as Ontwikkelaar
+    actor Admin as Admin/API client
     participant API as RemindersController
     participant W as ReminderWorker
-    participant B as MassTransit Bus
+    participant MQ as RabbitMQ / MassTransit
 
-    Dev->>API: POST /api/reminders/trigger (met JWT)
+    Admin->>API: POST /api/reminders/trigger with JWT
     API->>W: ProcessAsync()
-    W->>B: Publish SendReminderCommand (per due scheduled reminder)
-    B-->>W: Gepubliceerd
-    W-->>API: Klaar
-    API-->>Dev: 200 OK { "message": "Reminder-run voltooid." }
+    W->>MQ: Publish commands for due reminders
+    API-->>Admin: 200 OK
 ```
 
-## Data-retentie flow (elke 24 uur)
+## Retention
 
 ```mermaid
 sequenceDiagram
@@ -84,17 +78,8 @@ sequenceDiagram
     participant S as DataRetentionService
     participant DB as PostgreSQL
 
-    loop Elke 24 uur
-        W->>S: RunAsync()
-        S->>DB: DELETE FROM appointment_notifications WHERE start_utc < now - 14 dagen
-        DB-->>S: A records verwijderd
-        S->>DB: DELETE FROM reminder_logs WHERE encounter_start < now - 14 dagen
-        DB-->>S: N records verwijderd
-        S->>DB: DELETE FROM message_logs WHERE sent_at < now - 365 dagen
-        DB-->>S: M records verwijderd
-        S->>DB: DELETE FROM webhook_event_logs WHERE received_at_utc < now - 365 dagen
-        DB-->>S: W records verwijderd
-        S-->>W: DataRetentionResult(N, M, A, W)
-        W->>W: LogInformation(resultaat)
-    end
+    W->>S: RunAsync()
+    S->>DB: Delete appointment/reminder patient data older than 14 days
+    S->>DB: Delete message/webhook metadata older than 365 days
+    S-->>W: DataRetentionResult
 ```

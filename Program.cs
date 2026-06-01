@@ -3,6 +3,7 @@ using System.Threading.RateLimiting;
 using Api.Middleware;
 using Application.Auth;
 using Application.OpenMrs;
+using Application.Organizations;
 using Application.Security;
 using Infrastructure.Messaging.Consumers;
 using Infrastructure.Observability;
@@ -13,11 +14,14 @@ using OpenTelemetry.Trace;
 using Application.Reminders;
 using Application.Messaging;
 using Infrastructure.Auth;
+using Infrastructure.Configuration;
 using Infrastructure.Messaging;
 using Infrastructure.Messaging.Options;
 using Application.DataRetention;
 using Infrastructure.DataRetention;
+using Infrastructure.Health;
 using Infrastructure.OpenMrs;
+using Infrastructure.Organizations;
 using Infrastructure.Reminders;
 using Infrastructure.Messaging.Providers;
 using Infrastructure.Persistence;
@@ -29,8 +33,37 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Application.Webhooks;
+using Microsoft.OpenApi;
+
+// Load .env file for local development
+var envPath = Path.Combine(Directory.GetCurrentDirectory(), ".env");
+if (File.Exists(envPath))
+{
+    foreach (var line in File.ReadAllLines(envPath))
+    {
+        if (string.IsNullOrWhiteSpace(line) || line.StartsWith('#')) continue;
+        var parts = line.Split('=', 2);
+        if (parts.Length != 2) continue;
+        var key = parts[0].Trim();
+        var value = parts[1].Trim();
+        Environment.SetEnvironmentVariable(key, value);
+        if (key == "JWT_SECRET")
+        {
+            Environment.SetEnvironmentVariable("Jwt__SecretKey", value);
+        }
+    }
+}
 
 var builder = WebApplication.CreateBuilder(args);
+
+var hospitalConfigPath = builder.Configuration["HospitalConfiguration:FilePath"];
+if (!string.IsNullOrWhiteSpace(hospitalConfigPath))
+{
+    builder.Configuration.AddJsonFile(
+        hospitalConfigPath,
+        optional: false,
+        reloadOnChange: false);
+}
 
 // ---------------------------------------------------------------------------
 // Verwijder 'Server' header (lekt technologie-info aan aanvallers)
@@ -44,9 +77,17 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
     ?? throw new InvalidOperationException(
         "ConnectionStrings:DefaultConnection is not configured.");
 
-var jwtSecret = builder.Configuration["Jwt:SecretKey"]
-    ?? throw new InvalidOperationException(
-        "Jwt:SecretKey is not configured. Set via env var Jwt__SecretKey.");
+var jwtSecret = builder.Configuration["Jwt:SecretKey"];
+if (string.IsNullOrWhiteSpace(jwtSecret))
+{
+    jwtSecret = builder.Configuration["JWT_SECRET"];
+}
+
+if (string.IsNullOrWhiteSpace(jwtSecret))
+{
+    throw new InvalidOperationException(
+        "JWT Secret is not configured. Set Jwt:SecretKey in configuration, or Jwt__SecretKey / JWT_SECRET in environment/dotenv.");
+}
 
 if (jwtSecret.Length < 32)
     throw new InvalidOperationException(
@@ -133,14 +174,11 @@ if (databaseProvider.Equals("Sqlite", StringComparison.OrdinalIgnoreCase))
 {
     builder.Services.AddDbContext<ApplicationDbContext>(options =>
         options.UseSqlite(connectionString));
-    builder.Services.AddSingleton<IDbConnectionFactory>(_ =>
-        new SqliteConnectionFactory(connectionString));
 }
 else
 {
     builder.Services.AddDbContext<ApplicationDbContext>(options =>
         options.UseNpgsql(connectionString));
-    builder.Services.AddSingleton<IDbConnectionFactory, NpgsqlConnectionFactory>();
 }
 
 // Identity (ASP.NET Core Identity — password hashing, user management)
@@ -161,15 +199,26 @@ builder.Services
         opts.Lockout.MaxFailedAccessAttempts = 5;
         opts.Lockout.AllowedForNewUsers = true;
     })
+    .AddRoles<IdentityRole>()
     .AddEntityFrameworkStores<ApplicationDbContext>();
 
-builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.Configure<AdminBootstrapOptions>(builder.Configuration.GetSection("Admin"));
+builder.Services.AddScoped<AdminBootstrapSeeder>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddHealthChecks()
+    .AddCheck<DatabaseHealthCheck>("database");
 
 // ---------------------------------------------------------------------------
 // Messaging providers (externe communicatieplatformen)
 // ---------------------------------------------------------------------------
 builder.Services.AddHttpClient();
+builder.Services.AddHttpClient("openmrs", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
+builder.Services.Configure<HospitalConfigurationOptions>(builder.Configuration.GetSection("HospitalConfiguration"));
+builder.Services.AddScoped<IOrganizationConfigRepository, OrganizationConfigRepository>();
+builder.Services.AddScoped<OrganizationConfigSeeder>();
 builder.Services.Configure<MessagingOptions>(builder.Configuration.GetSection("Messaging"));
 builder.Services.Configure<SwiftSendOptions>(builder.Configuration.GetSection("Messaging:SwiftSend"));
 builder.Services.Configure<SecurePostOptions>(builder.Configuration.GetSection("Messaging:SecurePost"));
@@ -201,7 +250,7 @@ builder.Services.AddHostedService<OpenMrsPollWorker>();
 // OpenMRS webhook integratie
 // ---------------------------------------------------------------------------
 builder.Services.Configure<OpenMrsWebhookOptions>(builder.Configuration.GetSection("Webhooks:OpenMrs"));
-builder.Services.AddSingleton<IOpenMrsWebhookSignatureValidator, OpenMrsWebhookSignatureValidator>();
+builder.Services.AddScoped<IOpenMrsWebhookSignatureValidator, OpenMrsWebhookSignatureValidator>();
 builder.Services.Configure<EncryptionOptions>(builder.Configuration.GetSection("Encryption"));
 builder.Services.AddScoped<IEncryptionService, AesEncryptionService>();
 builder.Services.AddScoped<IFieldEncryptionService, FieldEncryptionService>();
@@ -229,6 +278,15 @@ builder.Services
 // MassTransit — in-memory voor dev, RabbitMQ voor productie
 // ---------------------------------------------------------------------------
 var rabbitMqHost = builder.Configuration["RabbitMq:Host"];
+var requiresDurableBroker =
+    !builder.Environment.IsDevelopment() &&
+    !builder.Environment.IsEnvironment("IntegrationTest");
+if (requiresDurableBroker && string.IsNullOrWhiteSpace(rabbitMqHost))
+{
+    throw new InvalidOperationException(
+        "RabbitMq:Host is required outside Development/IntegrationTest. In-memory queueing is not durable.");
+}
+
 builder.Services.AddMassTransit(x =>
 {
     x.AddConsumer<SendReminderConsumer>();
@@ -312,6 +370,10 @@ builder.Services.AddAuthorization(opts =>
         .RequireAuthenticatedUser()
         .Build();
 
+    opts.AddPolicy(AuthPolicies.AdminOnly, policy =>
+        policy.RequireAuthenticatedUser()
+              .RequireRole(AuthPolicies.AdminRole));
+
     opts.FallbackPolicy = new AuthorizationPolicyBuilder()
         .RequireAuthenticatedUser()
         .Build();
@@ -322,8 +384,35 @@ builder.Services.AddAuthorization(opts =>
 // ---------------------------------------------------------------------------
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-// Swagger UI — eenvoudige configuratie (Swashbuckle 10 / Microsoft.OpenApi 2.x)
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "OpenMRS Communication Backend API",
+        Version = "v1",
+        Description = "Backend-only API for OpenMRS appointment reminders, messaging providers, durable retry handling, and signed OpenMRS webhooks."
+    });
+
+    var bearerScheme = new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Description = "JWT bearer token from /auth/login. Example: Bearer eyJhbGciOi...",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT"
+    };
+
+    options.AddSecurityDefinition("Bearer", bearerScheme);
+    options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
+    {
+        [new OpenApiSecuritySchemeReference("Bearer", document, null)] = []
+    });
+
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, "OpenMRSmoduleBackend.xml");
+    if (File.Exists(xmlPath))
+        options.IncludeXmlComments(xmlPath);
+});
 builder.Services.AddOpenApi();
 
 
@@ -367,11 +456,24 @@ if (app.Configuration.GetValue("Database:RunMigrations", true))
             });
         await db.SaveChangesAsync();
     }
+
+}
+
+using (var seedScope = app.Services.CreateScope())
+{
+    if (app.Configuration.GetValue("Admin:SeedOnStartup", true))
+        await seedScope.ServiceProvider.GetRequiredService<AdminBootstrapSeeder>().SeedAsync();
+    if (app.Configuration.GetValue("HospitalConfiguration:SeedOnStartup", true))
+        await seedScope.ServiceProvider.GetRequiredService<OrganizationConfigSeeder>().SeedAsync();
 }
 
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+}
+
+if (app.Configuration.GetValue("Swagger:Enabled", true))
+{
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
@@ -379,7 +481,7 @@ if (app.Environment.IsDevelopment())
         c.DocumentTitle = "OpenMRS Module API — Swagger UI";
     });
 }
-else
+if (!app.Environment.IsDevelopment())
 {
     // HSTS + HTTPS-redirect alleen in productie (TLS via reverse proxy)
     app.UseHsts();
@@ -428,10 +530,11 @@ if (!app.Environment.IsEnvironment("IntegrationTest"))
 app.UseOpenTelemetryPrometheusScrapingEndpoint();
 
 app.UseAuthentication();
-app.UseAuthorization();
 
 // Map controllers. Algemene rate limiting (GlobalLimiter) geldt voor alles,
 // tenzij overschreven door specifieke [EnableRateLimiting] attributen.
+app.UseAuthorization();
+app.MapHealthChecks("/health/readiness").AllowAnonymous();
 app.MapControllers();
 
 app.Run();

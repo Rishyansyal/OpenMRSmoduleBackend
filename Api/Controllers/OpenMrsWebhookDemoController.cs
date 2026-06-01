@@ -1,28 +1,32 @@
 using System.Text.Json;
+using Application.Auth;
+using Application.Organizations;
 using Infrastructure.Webhooks;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Options;
+using Microsoft.AspNetCore.Authorization;
 
 namespace Api.Controllers;
 
 [ApiController]
 [Route("api/demo/webhooks/openmrs")]
-[Authorize]
-public class OpenMrsWebhookDemoController(IOptions<OpenMrsWebhookOptions> options) : ControllerBase
+[Authorize(Policy = AuthPolicies.AdminOnly)]
+public class OpenMrsWebhookDemoController(IOrganizationConfigRepository organizationConfigs) : ControllerBase
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     [HttpPost("signed-appointment")]
-    public IActionResult CreateSignedAppointment()
+    public async Task<IActionResult> CreateSignedAppointment([FromQuery] string? organizationId, CancellationToken ct)
     {
-        var secret = options.Value.Secret;
-        if (string.IsNullOrWhiteSpace(secret))
+        var organization = string.IsNullOrWhiteSpace(organizationId)
+            ? await organizationConfigs.GetDefaultAsync(ct)
+            : await organizationConfigs.GetByIdAsync(organizationId, ct);
+
+        if (organization is null)
         {
             return StatusCode(StatusCodes.Status503ServiceUnavailable, new
             {
-                error = "WEBHOOK_SECRET_NOT_CONFIGURED",
-                message = "OpenMRS webhook secret is not configured."
+                error = "OPENMRS_ORGANIZATION_NOT_CONFIGURED",
+                message = "OpenMRS organization is not configured."
             });
         }
 
@@ -42,7 +46,7 @@ public class OpenMrsWebhookDemoController(IOptions<OpenMrsWebhookOptions> option
             instructions = "Demonstratie webhook flow via de API"
         }, JsonOptions);
 
-        var signature = OpenMrsWebhookSignatureValidator.ComputeSignatureHex(timestamp, body, secret);
+        var signature = OpenMrsWebhookSignatureValidator.ComputeSignatureHex(timestamp, body, organization.WebhookSecret);
 
         return Ok(new
         {
@@ -55,7 +59,7 @@ public class OpenMrsWebhookDemoController(IOptions<OpenMrsWebhookOptions> option
                 ["X-OpenMRS-Event-Id"] = eventId,
                 ["X-OpenMRS-Event-Type"] = "encounter.created",
                 ["X-OpenMRS-Timestamp"] = timestamp,
-                ["X-OpenMRS-Organization-Id"] = "lu1",
+                ["X-OpenMRS-Organization-Id"] = organization.OrganizationId,
                 ["X-OpenMRS-Signature"] = $"sha256={signature}"
             }
         });

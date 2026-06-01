@@ -1,14 +1,14 @@
 using Application.Webhooks;
+using Application.Messaging;
+using Application.Organizations;
 using Application.Security;
 using Infrastructure.Persistence;
-using Infrastructure.Reminders;
 using Infrastructure.Security;
 using Infrastructure.Webhooks;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 
 namespace OpenMRSmoduleBackend.Tests.Webhooks;
 
@@ -92,7 +92,29 @@ public class OpenMrsWebhookServiceTests
         return new OpenMrsWebhookService(
             db,
             new FieldEncryptionService(config),
-            Options.Create(new ReminderOptions { DefaultProvider = "swiftsend" }));
+            new FakeOrganizationConfigRepository());
+    }
+
+    private sealed class FakeOrganizationConfigRepository : IOrganizationConfigRepository
+    {
+        private readonly OrganizationRuntimeConfig _config = new(
+            "org-1", "https://openmrs.test", "user", "password", "secret", "swiftsend", "UTC",
+            true, false, 5, 48, 10, 60, 60);
+
+        public Task<OrganizationRuntimeConfig?> GetByIdAsync(string organizationId, CancellationToken ct = default) =>
+            Task.FromResult<OrganizationRuntimeConfig?>(organizationId == "org-1" ? _config : null);
+
+        public Task<OrganizationRuntimeConfig?> GetDefaultAsync(CancellationToken ct = default) =>
+            Task.FromResult<OrganizationRuntimeConfig?>(_config);
+
+        public Task<IReadOnlyList<OrganizationRuntimeConfig>> GetPollingEnabledAsync(CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<OrganizationRuntimeConfig>>([]);
+
+        public Task<MessageProviderConfiguration?> GetProviderAsync(
+            string organizationId,
+            string providerName,
+            CancellationToken ct = default) =>
+            Task.FromResult<MessageProviderConfiguration?>(null);
     }
 
     private sealed class DbFixture : IAsyncDisposable

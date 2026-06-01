@@ -1,13 +1,24 @@
 sequenceDiagram
     autonumber
-    actor Dev as Ontwikkelaar
-    participant API as RemindersController
     participant W as ReminderWorker
-    participant B as MassTransit Bus
+    participant DB as PostgreSQL retry ledger
+    participant MQ as RabbitMQ / MassTransit
+    participant C as SendReminderConsumer
+    participant OM as OpenMRS FHIR
+    participant P as Configured Provider
 
-    Dev->>API: POST /api/reminders/trigger (met JWT)
-    API->>W: ProcessAsync()
-    W->>B: Publish SendReminderCommand (per due scheduled reminder)
-    B-->>W: Gepubliceerd
-    W-->>API: Klaar
-    API-->>Dev: 200 OK { "message": "Reminder-run voltooid." }
+    W->>DB: Claim due or retry-ready scheduled reminders
+    DB-->>W: Dispatch records
+    W->>MQ: Publish SendReminderCommand
+    MQ->>C: Deliver command
+    C->>DB: Check reminder idempotency
+    C->>OM: Get patient contact
+    C->>P: Send message through configured provider
+    alt Success
+        C->>DB: Mark sent, store provider message id, log success
+    else Transient failure
+        C->>DB: Increment attempt_count, set last_error_code and next_attempt_at_utc
+        C-->>MQ: Throw for MassTransit retry/dead-letter behavior
+    else Permanent failure or max attempts
+        C->>DB: Mark failed/dead_lettered and log failure
+    end

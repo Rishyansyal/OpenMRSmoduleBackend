@@ -1,43 +1,41 @@
 flowchart TB
-    classDef extuser fill:#fef3c7,stroke:#92400e,stroke-width:2px,color:#000
-    classDef edge fill:#dbeafe,stroke:#1e40af,stroke-width:2px,color:#000
-    classDef pod fill:#dcfce7,stroke:#166534,stroke-width:1px,color:#000
-    classDef db fill:#fce7f3,stroke:#9d174d,stroke-width:1px,color:#000
-    classDef ext fill:#e0e7ff,stroke:#4338ca,stroke-width:1px,color:#000
+    classDef edge fill:#d0ebff,stroke:#1971c2,color:#111
+    classDef app fill:#d3f9d8,stroke:#2b8a3e,color:#111
+    classDef db fill:#ffe3e3,stroke:#c92a2a,color:#111
+    classDef queue fill:#e5dbff,stroke:#5f3dc4,color:#111
+    classDef ext fill:#f1f3f5,stroke:#495057,color:#111
 
-    Zorg["👤 Zorgmedewerker<br/>(browser)"]:::extuser
+    clinician["Clinician"]:::ext
+    openmrs["OpenMRS O3 deployments<br/>one or more hospitals"]:::ext
+    providers["Messaging providers"]:::ext
 
-    subgraph DMZ["DMZ / Edge"]
-        LB["🛡️ Reverse proxy<br/>TLS 1.3 terminatie<br/>HSTS + HTTPS-redirect"]:::edge
+    subgraph edge["Edge"]
+        proxy["Reverse proxy<br/>TLS termination, HSTS, routing"]:::edge
     end
 
-    subgraph App["Applicatie-tier"]
-        FEpod["📦 frontend (Next.js)<br/>:3001"]:::pod
-        APIpod["📦 api (ASP.NET Core)<br/>:8080"]:::pod
-        Bus["📦 RabbitMQ<br/>:5672"]:::pod
+    subgraph app["Application tier"]
+        api1["API pod<br/>controllers, workers, consumers"]:::app
+        api2["API pod<br/>optional horizontal scale"]:::app
+        rabbit["RabbitMQ<br/>durable queues, retries, dead letters"]:::queue
     end
 
-    subgraph Data["Data-tier (privénetwerk)"]
-        PG[("🗄️ PostgreSQL 17<br/>:5432<br/>backups, AES-at-rest")]:::db
+    subgraph data["Data tier"]
+        pg[("PostgreSQL<br/>encrypted config, appointment state, retry ledger, audit logs")]:::db
     end
 
-    subgraph Obs["Observability"]
-        Prom["📊 Prometheus scrape<br/>/metrics"]:::pod
-    end
+    prometheus["Prometheus<br/>scrapes /metrics"]:::ext
 
-    subgraph Ext["Externe systemen"]
-        OMRS["💻 OpenMRS EMR<br/>FHIR R4 + webhooks"]:::ext
-        Prov["💻 Messaging Providers<br/>SwiftSend / SecurePost / LegacyLink / AsyncFlow"]:::ext
-    end
-
-    Zorg -->|HTTPS :443| LB
-    LB -->|HTTP :3001| FEpod
-    LB -->|HTTP :8080| APIpod
-    OMRS -->|signed webhook :443| LB
-    FEpod -.->|server-side| APIpod
-    APIpod --> PG
-    APIpod --> Bus
-    Bus --> APIpod
-    APIpod --> OMRS
-    APIpod --> Prov
-    APIpod --> Prom
+    clinician -->|"uses"| openmrs
+    openmrs -->|"signed webhooks HTTPS"| proxy
+    proxy --> api1
+    proxy --> api2
+    api1 --> pg
+    api2 --> pg
+    api1 <--> rabbit
+    api2 <--> rabbit
+    api1 -->|"FHIR R4"| openmrs
+    api2 -->|"FHIR R4"| openmrs
+    api1 --> providers
+    api2 --> providers
+    prometheus --> api1
+    prometheus --> api2

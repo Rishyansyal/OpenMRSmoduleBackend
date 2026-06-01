@@ -16,6 +16,7 @@ public class ApplicationDbContext(
     public DbSet<MessageLog> MessageLogs => Set<MessageLog>();
     public DbSet<MessageTemplate> MessageTemplates => Set<MessageTemplate>();
     public DbSet<OrganizationIntegrationConfig> OrganizationIntegrationConfigs => Set<OrganizationIntegrationConfig>();
+    public DbSet<OrganizationProviderConfig> OrganizationProviderConfigs => Set<OrganizationProviderConfig>();
     public DbSet<ReminderLog> ReminderLogs => Set<ReminderLog>();
     public DbSet<ScheduledReminder> ScheduledReminders => Set<ScheduledReminder>();
     public DbSet<WebhookEventLog> WebhookEventLogs => Set<WebhookEventLog>();
@@ -27,18 +28,6 @@ public class ApplicationDbContext(
         var encryptConverter = new ValueConverter<string, string>(
             v => encryption.Encrypt(v),
             v => encryption.Decrypt(v));
-
-        builder.Entity<User>(e =>
-        {
-            e.ToTable("users");
-            e.HasKey(u => u.Id);
-            e.Property(u => u.Id).HasColumnName("id");
-            e.Property(u => u.Email).HasColumnName("email").IsRequired().HasConversion(encryptConverter);
-            e.Property(u => u.EmailHash).HasColumnName("email_hash").IsRequired();
-            e.HasIndex(u => u.EmailHash).IsUnique();
-            e.Property(u => u.PasswordHash).HasColumnName("password_hash").IsRequired();
-            e.Property(u => u.CreatedAt).HasColumnName("created_at");
-        });
 
         builder.Entity<ReminderLog>(e =>
         {
@@ -91,6 +80,13 @@ public class ApplicationDbContext(
             e.Property(r => r.Provider).HasColumnName("provider").IsRequired();
             e.Property(r => r.Status).HasColumnName("status").IsRequired();
             e.Property(r => r.LastErrorCode).HasColumnName("last_error_code");
+            e.Property(r => r.AttemptCount).HasColumnName("attempt_count");
+            e.Property(r => r.MaxAttempts).HasColumnName("max_attempts");
+            e.Property(r => r.RetryBaseDelaySeconds).HasColumnName("retry_base_delay_seconds");
+            e.Property(r => r.RetryMaxDelayMinutes).HasColumnName("retry_max_delay_minutes");
+            e.Property(r => r.LastAttemptAtUtc).HasColumnName("last_attempt_at_utc");
+            e.Property(r => r.NextAttemptAtUtc).HasColumnName("next_attempt_at_utc");
+            e.Property(r => r.ProviderMessageId).HasColumnName("provider_message_id");
             e.Property(r => r.SentAtUtc).HasColumnName("sent_at_utc");
             e.Property(r => r.CreatedAtUtc).HasColumnName("created_at_utc");
             e.Property(r => r.UpdatedAtUtc).HasColumnName("updated_at_utc");
@@ -99,6 +95,7 @@ public class ApplicationDbContext(
                 .HasForeignKey(r => r.AppointmentNotificationId)
                 .OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(r => new { r.Status, r.ScheduledForUtc });
+            e.HasIndex(r => new { r.Status, r.NextAttemptAtUtc });
             e.HasIndex(r => new { r.AppointmentNotificationId, r.ReminderWindow });
         });
 
@@ -128,11 +125,38 @@ public class ApplicationDbContext(
             e.HasKey(o => o.Id);
             e.Property(o => o.Id).HasColumnName("id");
             e.Property(o => o.OrganizationId).HasColumnName("organization_id").IsRequired();
+            e.Property(o => o.OpenMrsBaseUrl).HasColumnName("openmrs_base_url").IsRequired();
+            e.Property(o => o.OpenMrsUsernameEncrypted).HasColumnName("openmrs_username_encrypted").IsRequired();
+            e.Property(o => o.OpenMrsPasswordEncrypted).HasColumnName("openmrs_password_encrypted").IsRequired();
+            e.Property(o => o.WebhookSecretEncrypted).HasColumnName("webhook_secret_encrypted").IsRequired();
+            e.Property(o => o.Enabled).HasColumnName("enabled");
             e.Property(o => o.DefaultProvider).HasColumnName("default_provider").IsRequired();
             e.Property(o => o.TimeZoneId).HasColumnName("time_zone_id").IsRequired();
+            e.Property(o => o.PollerEnabled).HasColumnName("poller_enabled");
+            e.Property(o => o.PollerIntervalMinutes).HasColumnName("poller_interval_minutes");
+            e.Property(o => o.PollerLookaheadHours).HasColumnName("poller_lookahead_hours");
+            e.Property(o => o.MaxDeliveryAttempts).HasColumnName("max_delivery_attempts");
+            e.Property(o => o.RetryBaseDelaySeconds).HasColumnName("retry_base_delay_seconds");
+            e.Property(o => o.RetryMaxDelayMinutes).HasColumnName("retry_max_delay_minutes");
             e.Property(o => o.CreatedAtUtc).HasColumnName("created_at_utc");
             e.Property(o => o.UpdatedAtUtc).HasColumnName("updated_at_utc");
             e.HasIndex(o => o.OrganizationId).IsUnique();
+        });
+
+        builder.Entity<OrganizationProviderConfig>(e =>
+        {
+            e.ToTable("organization_provider_configs");
+            e.HasKey(o => o.Id);
+            e.Property(o => o.Id).HasColumnName("id");
+            e.Property(o => o.OrganizationId).HasColumnName("organization_id").IsRequired();
+            e.Property(o => o.ProviderName).HasColumnName("provider_name").IsRequired();
+            e.Property(o => o.Enabled).HasColumnName("enabled");
+            e.Property(o => o.BaseUrl).HasColumnName("base_url").IsRequired();
+            e.Property(o => o.StudentGroup).HasColumnName("student_group").IsRequired();
+            e.Property(o => o.CredentialsJsonEncrypted).HasColumnName("credentials_json_encrypted").IsRequired();
+            e.Property(o => o.CreatedAtUtc).HasColumnName("created_at_utc");
+            e.Property(o => o.UpdatedAtUtc).HasColumnName("updated_at_utc");
+            e.HasIndex(o => new { o.OrganizationId, o.ProviderName }).IsUnique();
         });
 
         builder.Entity<MessageLog>(e =>

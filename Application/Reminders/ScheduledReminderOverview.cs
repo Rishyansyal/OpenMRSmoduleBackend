@@ -10,4 +10,9 @@ public record ScheduledReminderOverview(
     string Provider,
     string Status,
     bool AppointmentCancelled,
-    string? LastErrorCode);
+    string? LastErrorCode,
+    int AttemptCount,
+    int MaxAttempts,
+    DateTime? LastAttemptAtUtc,
+    DateTime? NextAttemptAtUtc,
+    string? ProviderMessageId);
