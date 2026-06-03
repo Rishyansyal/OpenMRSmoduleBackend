@@ -11,7 +11,19 @@ public interface IScheduledReminderRepository
 
     Task MarkFailedAsync(Guid scheduledReminderId, string errorCode, CancellationToken ct = default);
 
+    Task RecordQueuePublishAsync(
+        Guid scheduledReminderId,
+        Guid queueMessageId,
+        CancellationToken ct = default);
+
+    Task RecordQueuePublishFailureAsync(
+        Guid scheduledReminderId,
+        string errorCode,
+        CancellationToken ct = default);
+
     Task MarkSendingAsync(Guid scheduledReminderId, CancellationToken ct = default);
+
+    Task MarkConsumedAsync(Guid scheduledReminderId, CancellationToken ct = default);
 
     Task RecordDeliveryAttemptAsync(
         Guid scheduledReminderId,

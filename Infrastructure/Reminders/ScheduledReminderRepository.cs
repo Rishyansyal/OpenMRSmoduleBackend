@@ -9,7 +9,8 @@ namespace Infrastructure.Reminders;
 
 public class ScheduledReminderRepository(
     ApplicationDbContext db,
-    IFieldEncryptionService encryption) : IScheduledReminderRepository
+    IFieldEncryptionService fieldEncryption,
+    IEncryptionService encryption) : IScheduledReminderRepository
 {
     public async Task<IReadOnlyList<ScheduledReminderDispatch>> ClaimDueAsync(
         DateTime nowUtc,
@@ -37,6 +38,9 @@ public class ScheduledReminderRepository(
         {
             reminder.Status = ScheduledReminderStatus.Queued;
             reminder.UpdatedAtUtc = now;
+            reminder.QueueMessageId = null;
+            reminder.QueuedAtUtc = null;
+            reminder.ConsumedAtUtc = null;
         }
 
         await db.SaveChangesAsync(ct);
@@ -49,16 +53,50 @@ public class ScheduledReminderRepository(
                 r.Id,
                 r.OrganizationId,
                 r.EncounterId,
-                encryption.Decrypt(appointment.PatientIdEncrypted),
+                fieldEncryption.Decrypt(appointment.PatientIdEncrypted),
                 r.ReminderWindow,
                 appointment.StartUtc,
-                encryption.DecryptNullable(appointment.ServiceTypeEncrypted),
+                fieldEncryption.DecryptNullable(appointment.ServiceTypeEncrypted),
                 r.Provider,
                 r.AttemptCount,
                 r.MaxAttempts,
-                encryption.DecryptNullable(appointment.LocationEncrypted),
-                encryption.DecryptNullable(appointment.InstructionsEncrypted));
+                fieldEncryption.DecryptNullable(appointment.LocationEncrypted),
+                fieldEncryption.DecryptNullable(appointment.InstructionsEncrypted));
         }).ToList();
+    }
+
+    public async Task RecordQueuePublishAsync(
+        Guid scheduledReminderId,
+        Guid queueMessageId,
+        CancellationToken ct = default)
+    {
+        var reminder = await db.ScheduledReminders.SingleOrDefaultAsync(r => r.Id == scheduledReminderId, ct);
+        if (reminder is null) return;
+
+        reminder.Status = ScheduledReminderStatus.Queued;
+        reminder.QueueMessageId = queueMessageId.ToString("D");
+        reminder.QueuedAtUtc = DateTime.UtcNow;
+        reminder.UpdatedAtUtc = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+    }
+
+    public async Task RecordQueuePublishFailureAsync(
+        Guid scheduledReminderId,
+        string errorCode,
+        CancellationToken ct = default)
+    {
+        var reminder = await db.ScheduledReminders.SingleOrDefaultAsync(r => r.Id == scheduledReminderId, ct);
+        if (reminder is null) return;
+
+        var now = DateTime.UtcNow;
+        reminder.Status = ScheduledReminderStatus.RetryWait;
+        reminder.LastErrorCode = errorCode;
+        reminder.NextAttemptAtUtc = now.Add(ComputeBackoff(reminder));
+        reminder.QueueMessageId = null;
+        reminder.QueuedAtUtc = null;
+        reminder.ConsumedAtUtc = null;
+        reminder.UpdatedAtUtc = now;
+        await db.SaveChangesAsync(ct);
     }
 
     public async Task MarkSentAsync(Guid scheduledReminderId, CancellationToken ct = default)
@@ -91,6 +129,16 @@ public class ScheduledReminderRepository(
 
         reminder.Status = ScheduledReminderStatus.Sending;
         reminder.LastAttemptAtUtc = DateTime.UtcNow;
+        reminder.UpdatedAtUtc = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+    }
+
+    public async Task MarkConsumedAsync(Guid scheduledReminderId, CancellationToken ct = default)
+    {
+        var reminder = await db.ScheduledReminders.SingleOrDefaultAsync(r => r.Id == scheduledReminderId, ct);
+        if (reminder is null) return;
+
+        reminder.ConsumedAtUtc = DateTime.UtcNow;
         reminder.UpdatedAtUtc = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
     }
@@ -151,15 +199,19 @@ public class ScheduledReminderRepository(
 
     public async Task<IReadOnlyList<ScheduledReminderOverview>> GetRecentAsync(
         int count = 50,
-        CancellationToken ct = default) =>
-        await db.ScheduledReminders
+        CancellationToken ct = default)
+    {
+        var reminders = await db.ScheduledReminders
             .Include(r => r.AppointmentNotification)
             .OrderByDescending(r => r.ScheduledForUtc)
             .Take(count)
+            .ToListAsync(ct);
+
+        return reminders
             .Select(r => new ScheduledReminderOverview(
                 r.Id,
                 r.OrganizationId,
-                r.EncounterId,
+                encryption.Hash(r.EncounterId),
                 r.ReminderWindow,
                 r.ScheduledForUtc,
                 r.AppointmentNotification == null ? DateTime.MinValue : r.AppointmentNotification.StartUtc,
@@ -171,8 +223,12 @@ public class ScheduledReminderRepository(
                 r.MaxAttempts,
                 r.LastAttemptAtUtc,
                 r.NextAttemptAtUtc,
+                r.QueueMessageId,
+                r.QueuedAtUtc,
+                r.ConsumedAtUtc,
                 r.ProviderMessageId))
-            .ToListAsync(ct);
+            .ToList();
+    }
 
     private static TimeSpan ComputeBackoff(ScheduledReminder reminder)
     {

@@ -18,7 +18,7 @@ flowchart TB
         openmrs["OpenMRS O3 compose<br/>gateway :3032, backend, frontend, MariaDB"]:::container
         api["OpenMRSmoduleBackend api<br/>localhost:5111"]:::container
         pg[("PostgreSQL<br/>backend network only")]:::db
-        bus["MassTransit transport<br/>in-memory by default or RabbitMQ when configured"]:::queue
+        bus["RabbitMQ / MassTransit<br/>required outside IntegrationTest"]:::queue
     end
 
     browser --> openmrs
@@ -77,7 +77,7 @@ flowchart TB
 
 ## Notes
 
-- RabbitMQ is required for durable production delivery.
+- RabbitMQ is required for development, staging, and production delivery. Only `IntegrationTest` uses in-memory MassTransit.
 - PostgreSQL is the source of truth for retry state; RabbitMQ is the transport, not the business ledger.
 - Multiple OpenMRS O3 deployments are separated by organization id and per-org secrets.
 - Provider fallback is not automatic. Operational retry targets the same configured provider.

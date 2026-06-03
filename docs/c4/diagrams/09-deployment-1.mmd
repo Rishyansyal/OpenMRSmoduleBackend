@@ -11,7 +11,7 @@ flowchart TB
         openmrs["OpenMRS O3 compose<br/>gateway :3032, backend, frontend, MariaDB"]:::container
         api["OpenMRSmoduleBackend api<br/>localhost:5111"]:::container
         pg[("PostgreSQL<br/>backend network only")]:::db
-        bus["MassTransit transport<br/>in-memory by default or RabbitMQ when configured"]:::queue
+        bus["RabbitMQ / MassTransit<br/>required outside IntegrationTest"]:::queue
     end
 
     browser --> openmrs

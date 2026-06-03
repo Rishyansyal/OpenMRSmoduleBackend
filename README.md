@@ -2,7 +2,7 @@
 
 ASP.NET Core backend for the OpenMRS O3 communication module. The custom Next.js frontend has been removed from this architecture: users work through OpenMRS O3, direct REST/API clients, or Swagger during development.
 
-The backend receives signed appointment events from OpenMRS, schedules 24-hour and 1-hour reminders, sends messages through FakeComWorld-compatible providers, and stores delivery state in PostgreSQL. RabbitMQ is the durable production transport for reminder commands; PostgreSQL remains the source of truth for appointment state, retry state, audit logs, and organization configuration.
+The backend receives signed appointment events from OpenMRS, schedules 24-hour and 1-hour reminders, sends messages through FakeComWorld-compatible providers, and stores delivery state in PostgreSQL. RabbitMQ is required for reminder command transport outside integration tests; PostgreSQL remains the source of truth for appointment state, retry state, audit logs, and organization configuration.
 
 ## Current Scope
 
@@ -19,7 +19,7 @@ The backend receives signed appointment events from OpenMRS, schedules 24-hour a
 - Signed OpenMRS appointment webhook endpoint with HMAC validation, timestamp checks, and event idempotency.
 - Optional OpenMRS poll worker per organization for environments where webhook delivery is unavailable.
 - PostgreSQL persistence for users, appointment notifications, scheduled reminders, retry ledger fields, message logs, webhook logs, organization configs, provider configs, and templates.
-- RabbitMQ transport in durable environments, with MassTransit retry and dead-letter behavior.
+- RabbitMQ transport for every non-test runtime, with MassTransit retry and dead-letter behavior.
 - Provider adapters for SwiftSend, SecurePost, LegacyLink, and AsyncFlow.
 - Health checks, OpenTelemetry tracing, and Prometheus metrics.
 
@@ -29,6 +29,7 @@ The backend receives signed appointment events from OpenMRS, schedules 24-hour a
 |---|---|---|
 | OpenMRS O3 distro | EMR UI, OpenMRS backend, MariaDB | `http://localhost:3032/openmrs` |
 | OpenMRSmoduleBackend | ASP.NET Core API and PostgreSQL | `http://localhost:5111` |
+| RabbitMQ management | Local queue verification | `http://localhost:15672` |
 | FakeComWorld | Simulated messaging providers | `http://localhost:1337` |
 
 ## Prerequisites
@@ -57,7 +58,7 @@ Minimum required values:
 | `OPENMRS_ORGANIZATION_ID`, `OPENMRS_BASE_URL`, `OPENMRS_USERNAME`, `OPENMRS_PASSWORD` | Legacy single-organization OpenMRS identity and connection used when JSON hospital config is absent. The id must match OpenMRS `OPENMRS_WEBHOOK_ORGANIZATION_ID`. |
 | `OPENMRS_WEBHOOK_SECRET` | Legacy single-organization webhook secret. |
 | `MESSAGING_STUDENT_GROUP`, `MESSAGING_*` | Provider credentials for FakeComWorld. |
-| `RABBITMQ_HOST`, `RABBITMQ_USERNAME`, `RABBITMQ_PASSWORD` | Required for RabbitMQ transport. Leave host empty only for local in-memory transport. |
+| `RABBITMQ_HOST`, `RABBITMQ_USERNAME`, `RABBITMQ_PASSWORD` | Required for RabbitMQ transport outside `IntegrationTest`. |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Bootstrapped admin account. |
 | `ALLOW_PUBLIC_REGISTRATION` | Set `true` only when public self-registration is intentionally allowed. |
 
@@ -120,6 +121,14 @@ Verify:
 curl http://localhost:5111/health
 ```
 
+Local runtime verification:
+
+```powershell
+..\2.4-LU1-openMRS-Avans\tests\smoke\openmrs-spa-smoke.ps1
+```
+
+Then confirm RabbitMQ is healthy at `http://localhost:15672`, trigger a signed synthetic webhook from Swagger or the demo endpoint, inspect `/api/reminders/scheduled`, and trigger `/api/reminders/trigger`. Scheduled reminder output is operational metadata only: it includes status, provider, timestamps, queue message id, provider message id, and a hashed encounter reference, not patient names, contact details, message content, or plaintext encounter ids.
+
 ## Auth Flow
 
 The backend bootstraps an admin user when `Admin__Email` and `Admin__Password` are configured. Public registration returns `403 PUBLIC_REGISTRATION_DISABLED` unless `Admin__AllowPublicRegistration=true`.
@@ -141,6 +150,15 @@ POST /api/webhooks/openmrs/appointments
 ```
 
 The backend validates `X-OpenMRS-Organization-Id`, timestamp, and HMAC signature before it processes the body. Accepted events upsert appointment state, write a webhook audit row, and create/cancel scheduled reminders. See [docs/webhook-openmrs-backend.md](docs/webhook-openmrs-backend.md).
+
+## Reminder Message Templates
+
+Default templates are stored in `message_templates` and can be updated through the admin reminder template endpoints. Supported placeholders are `{type}`, `{tijd}`, `{locatie}`, and `{instructies}`.
+
+Synthetic examples:
+
+- `24h`: `Herinnering: u heeft morgen een Controle op donderdag 4 juni om 10:30 bij Polikliniek A. Belangrijk: Neem uw medicatie mee. Neem contact op bij vragen.`
+- `1h`: `Herinnering: u heeft over ongeveer 1 uur een Controle op donderdag 4 juni om 10:30 bij Polikliniek A.`
 
 ## Tests
 

@@ -50,6 +50,50 @@ public class ScheduledReminderRepositoryTests
         Assert.Null(updated.NextAttemptAtUtc);
     }
 
+    [Fact]
+    public async Task RecordQueuePublishAsync_StoresQueueEvidence()
+    {
+        await using var fixture = await DbFixture.CreateAsync();
+        var reminder = await fixture.SeedReminderAsync();
+        var messageId = Guid.NewGuid();
+
+        await fixture.Repository.RecordQueuePublishAsync(reminder.Id, messageId);
+
+        var updated = await fixture.Db.ScheduledReminders.SingleAsync();
+        Assert.Equal(ScheduledReminderStatus.Queued, updated.Status);
+        Assert.Equal(messageId.ToString("D"), updated.QueueMessageId);
+        Assert.NotNull(updated.QueuedAtUtc);
+    }
+
+    [Fact]
+    public async Task RecordQueuePublishFailureAsync_MovesQueuedReminderBackToRetryWait()
+    {
+        await using var fixture = await DbFixture.CreateAsync();
+        var reminder = await fixture.SeedReminderAsync();
+
+        await fixture.Repository.RecordQueuePublishAsync(reminder.Id, Guid.NewGuid());
+        await fixture.Repository.RecordQueuePublishFailureAsync(reminder.Id, "QUEUE_PUBLISH_FAILED");
+
+        var updated = await fixture.Db.ScheduledReminders.SingleAsync();
+        Assert.Equal(ScheduledReminderStatus.RetryWait, updated.Status);
+        Assert.Equal("QUEUE_PUBLISH_FAILED", updated.LastErrorCode);
+        Assert.Null(updated.QueueMessageId);
+        Assert.Null(updated.QueuedAtUtc);
+        Assert.NotNull(updated.NextAttemptAtUtc);
+    }
+
+    [Fact]
+    public async Task GetRecentAsync_ReturnsHashedEncounterReference()
+    {
+        await using var fixture = await DbFixture.CreateAsync();
+        await fixture.SeedReminderAsync();
+
+        var overview = Assert.Single(await fixture.Repository.GetRecentAsync());
+
+        Assert.False(string.IsNullOrWhiteSpace(overview.EncounterReferenceHash));
+        Assert.NotEqual("enc-1", overview.EncounterReferenceHash);
+    }
+
     private sealed class DbFixture : IAsyncDisposable
     {
         private readonly SqliteConnection _connection;
@@ -136,7 +180,8 @@ public class ScheduledReminderRepositoryTests
             Db = db;
             Repository = new ScheduledReminderRepository(
                 db,
-                scope.ServiceProvider.GetRequiredService<IFieldEncryptionService>());
+                scope.ServiceProvider.GetRequiredService<IFieldEncryptionService>(),
+                scope.ServiceProvider.GetRequiredService<IEncryptionService>());
         }
     }
 
