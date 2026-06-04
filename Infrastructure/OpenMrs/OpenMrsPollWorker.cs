@@ -61,28 +61,28 @@ public class OpenMrsPollWorker(
             var now = DateTime.UtcNow;
             var to = now.AddHours(organization.PollerLookaheadHours);
 
-            var encounters = await openMrs.GetEncountersInRangeAsync(organization.OrganizationId, now, to, ct);
+            var appointments = await openMrs.GetAppointmentsInRangeAsync(organization.OrganizationId, now, to, ct);
             var seen = 0;
             var accepted = 0;
             var duplicates = 0;
 
-            foreach (var enc in encounters)
+            foreach (var appt in appointments)
             {
-                if (string.IsNullOrWhiteSpace(enc.PatientId) || enc.Start == DateTime.MinValue)
+                if (string.IsNullOrWhiteSpace(appt.PatientId) || appt.Start == DateTime.MinValue)
                     continue;
 
                 seen++;
 
                 var payload = new OpenMrsAppointmentWebhookRequest(
-                    EncounterId: enc.Id,
-                    PatientId: enc.PatientId,
-                    Start: enc.Start,
-                    Status: string.IsNullOrWhiteSpace(enc.Status) ? "planned" : enc.Status,
-                    End: enc.End,
-                    PatientDisplay: string.IsNullOrWhiteSpace(enc.PatientDisplay) ? null : enc.PatientDisplay,
-                    ServiceType: enc.ServiceType,
-                    Location: enc.Location,
-                    Instructions: enc.Instructions);
+                    EncounterId: appt.Id,
+                    PatientId: appt.PatientId,
+                    Start: appt.Start,
+                    Status: string.IsNullOrWhiteSpace(appt.Status) ? "planned" : appt.Status,
+                    End: appt.End,
+                    PatientDisplay: string.IsNullOrWhiteSpace(appt.PatientDisplay) ? null : appt.PatientDisplay,
+                    ServiceType: appt.ServiceType,
+                    Location: appt.Location,
+                    Instructions: appt.Instructions);
 
                 var eventId = BuildSyntheticEventId(payload);
 
@@ -101,13 +101,13 @@ public class OpenMrsPollWorker(
                 }
                 catch (Exception ex)
                 {
-                    logger.LogWarning(ex, "Poll-event voor encounter {enc} kon niet worden verwerkt.", enc.Id);
+                    logger.LogWarning(ex, "Poll-event voor afspraak {appt} kon niet worden verwerkt.", appt.Id);
                 }
             }
 
             if (seen > 0)
                 logger.LogInformation(
-                    "OpenMRS-poll voor {org}: {seen} encounters gezien, {accepted} nieuw/gewijzigd, {dup} ongewijzigd.",
+                    "OpenMRS-poll voor {org}: {seen} afspraken gezien, {accepted} nieuw/gewijzigd, {dup} ongewijzigd.",
                     organization.OrganizationId, seen, accepted, duplicates);
         }
     }

@@ -88,6 +88,30 @@ public class OpenMrsService(
         return ParseAppointmentBundle(doc.RootElement).ToList();
     }
 
+    // Haalt afspraken uit de Bahmni Appointment Scheduling-module (de O3 "Appointments"-app).
+    // Dit is een ander resourcetype dan FHIR Encounters: afspraken worden vooruit gepland en
+    // vormen de basis voor afspraakherinneringen.
+    public async Task<IEnumerable<UpcomingAppointment>> GetAppointmentsInRangeAsync(
+        string organizationId,
+        DateTime from,
+        DateTime to,
+        CancellationToken ct = default)
+    {
+        var (client, config) = await CreateClientAsync(organizationId, ct);
+        var requestBody = JsonSerializer.Serialize(new
+        {
+            startDate = from.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+            endDate = to.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+        });
+        var url = $"{config.OpenMrsBaseUrl.TrimEnd('/')}/openmrs/ws/rest/v1/appointments/search";
+        using var content = new StringContent(requestBody, Encoding.UTF8, "application/json");
+        var response = await client.PostAsync(url, content, ct);
+        response.EnsureSuccessStatusCode();
+
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
+        return ParseBahmniAppointments(doc.RootElement).ToList();
+    }
+
     public async Task<UpcomingAppointment> CreateVisitAsync(
         string organizationId,
         CreateVisitRequest request,
@@ -311,5 +335,53 @@ public class OpenMrsService(
         }
 
         return new UpcomingAppointment(id, status, start, end, patientId, patientDisplay, serviceType, location);
+    }
+
+    private static IEnumerable<UpcomingAppointment> ParseBahmniAppointments(JsonElement root)
+    {
+        if (root.ValueKind != JsonValueKind.Array) yield break;
+        foreach (var element in root.EnumerateArray())
+        {
+            var appointment = ParseBahmniAppointment(element);
+            if (appointment is not null) yield return appointment;
+        }
+    }
+
+    private static UpcomingAppointment? ParseBahmniAppointment(JsonElement a)
+    {
+        var id = a.TryGetProperty("uuid", out var u) ? u.GetString() ?? "" : "";
+        if (string.IsNullOrEmpty(id)) return null;
+
+        if (!a.TryGetProperty("startDateTime", out var startEl) || startEl.ValueKind != JsonValueKind.Number)
+            return null;
+        var start = DateTimeOffset.FromUnixTimeMilliseconds(startEl.GetInt64()).UtcDateTime;
+
+        DateTime? end = null;
+        if (a.TryGetProperty("endDateTime", out var endEl) && endEl.ValueKind == JsonValueKind.Number)
+            end = DateTimeOffset.FromUnixTimeMilliseconds(endEl.GetInt64()).UtcDateTime;
+
+        var status = a.TryGetProperty("status", out var s) ? s.GetString() ?? "" : "";
+
+        string patientId = "", patientDisplay = "";
+        if (a.TryGetProperty("patient", out var patient) && patient.ValueKind == JsonValueKind.Object)
+        {
+            patientId = patient.TryGetProperty("uuid", out var pu) ? pu.GetString() ?? "" : "";
+            patientDisplay = patient.TryGetProperty("name", out var pn) ? pn.GetString() ?? "" : "";
+        }
+
+        string? serviceType = null;
+        if (a.TryGetProperty("service", out var service) && service.ValueKind == JsonValueKind.Object &&
+            service.TryGetProperty("name", out var sn))
+            serviceType = sn.GetString();
+
+        string? location = null;
+        if (a.TryGetProperty("location", out var loc) && loc.ValueKind == JsonValueKind.Object &&
+            loc.TryGetProperty("name", out var ln))
+            location = ln.GetString();
+
+        var instructions = a.TryGetProperty("comments", out var c) ? c.GetString() : null;
+        if (string.IsNullOrWhiteSpace(instructions)) instructions = null;
+
+        return new UpcomingAppointment(id, status, start, end, patientId, patientDisplay, serviceType, location, instructions);
     }
 }
