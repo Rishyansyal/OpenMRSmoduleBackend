@@ -275,15 +275,16 @@ builder.Services
         .AddPrometheusExporter());
 
 // ---------------------------------------------------------------------------
-// MassTransit — RabbitMQ buiten IntegrationTest; in-memory alleen voor tests
+// MassTransit — in-memory voor dev, RabbitMQ voor productie
 // ---------------------------------------------------------------------------
 var rabbitMqHost = builder.Configuration["RabbitMq:Host"];
 var requiresDurableBroker =
+    !builder.Environment.IsDevelopment() &&
     !builder.Environment.IsEnvironment("IntegrationTest");
 if (requiresDurableBroker && string.IsNullOrWhiteSpace(rabbitMqHost))
 {
     throw new InvalidOperationException(
-        "RabbitMq:Host is required outside IntegrationTest. In-memory queueing is not durable and is not allowed for development runtime verification.");
+        "RabbitMq:Host is required outside Development/IntegrationTest. In-memory queueing is not durable.");
 }
 
 builder.Services.AddMassTransit(x =>
@@ -311,17 +312,13 @@ builder.Services.AddMassTransit(x =>
             cfg.ConfigureEndpoints(ctx);
         });
     }
-    else if (builder.Environment.IsEnvironment("IntegrationTest"))
+    else
     {
         x.UsingInMemory((ctx, cfg) =>
         {
             cfg.UseMessageRetry(r => r.Immediate(3));
             cfg.ConfigureEndpoints(ctx);
         });
-    }
-    else
-    {
-        throw new InvalidOperationException("RabbitMQ transport is required outside IntegrationTest.");
     }
 });
 
@@ -340,7 +337,6 @@ builder.Services.Configure<ReminderOptions>(builder.Configuration.GetSection("Re
 builder.Services.AddScoped<IReminderLogRepository, ReminderLogRepository>();
 builder.Services.AddScoped<IScheduledReminderRepository, ScheduledReminderRepository>();
 builder.Services.AddScoped<IMessageTemplateRepository, MessageTemplateRepository>();
-builder.Services.AddScoped<IReminderMessageRenderer, ReminderMessageRenderer>();
 builder.Services.AddSingleton<ReminderWorker>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<ReminderWorker>());
 

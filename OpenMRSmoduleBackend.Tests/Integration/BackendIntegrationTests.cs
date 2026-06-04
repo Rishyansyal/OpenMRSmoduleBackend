@@ -89,8 +89,7 @@ public sealed class BackendIntegrationTests(
         Assert.Equal(2, scheduledJson.RootElement.GetArrayLength());
         Assert.All(scheduledJson.RootElement.EnumerateArray(), reminder =>
         {
-            Assert.False(reminder.TryGetProperty("encounterId", out _));
-            Assert.False(string.IsNullOrWhiteSpace(reminder.GetProperty("encounterReferenceHash").GetString()));
+            Assert.Equal("enc-100", reminder.GetProperty("encounterId").GetString());
             Assert.Equal("pending", reminder.GetProperty("status").GetString());
         });
     }

@@ -19,7 +19,7 @@ Treat asynchronous messaging as a separate logical component with its own failur
 | Part | Implementation | Role |
 |---|---|---|
 | Producer | `ReminderWorker` | Claims due PostgreSQL reminders and publishes commands. |
-| Transport | RabbitMQ through MassTransit | Durable command delivery in development, staging, and production. |
+| Transport | RabbitMQ through MassTransit | Durable command delivery in production-like environments. |
 | Consumer | `SendReminderConsumer` | Performs FHIR lookup, sends through the selected provider, and records results. |
 | Ledger | PostgreSQL `scheduled_reminders` and logs | Owns business state, retries, and audit. |
 

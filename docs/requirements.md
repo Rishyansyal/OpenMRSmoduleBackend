@@ -20,7 +20,7 @@
 | NFE-4 | OpenMRS 2.7.x+ / O3-compatible deployment | Local target is OpenMRS O3 distro on port 3032. |
 | NFE-5 | AES-256 and no secrets in code | Field encryption keys come from configuration; `.env` is gitignored; organization/provider secrets are encrypted before storage. |
 | NFE-6 | HL7/FHIR | FHIR R4 client retrieves patient contact and encounter data from each configured OpenMRS instance. |
-| NFE-7 | Retry and queueing | RabbitMQ + MassTransit retries in every non-test runtime; PostgreSQL scheduled reminder fields form the retry ledger. Provider fallback is intentionally not automatic. |
+| NFE-7 | Retry and queueing | RabbitMQ + MassTransit retries in durable environments; PostgreSQL scheduled reminder fields form the retry ledger. Provider fallback is intentionally not automatic. |
 | NFE-8 | Character sets | JSON and XML provider calls use UTF-8. |
 | NFE-9 | Observability | OpenTelemetry tracing and Prometheus `/metrics`. |
 | NFE-10 | Patient data removed within 14 days | `DataRetentionWorker` deletes appointment/reminder patient data. |

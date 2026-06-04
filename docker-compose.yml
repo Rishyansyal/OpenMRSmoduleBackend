@@ -1,6 +1,6 @@
 services:
   rabbitmq:
-    image: rabbitmq:4.1-management-alpine
+    image: rabbitmq:4.1-alpine
     restart: unless-stopped
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:?RABBITMQ_USERNAME is required}

@@ -1,6 +1,6 @@
 # C4 Level 2 - Containers
 
-The deployable backend system consists of the API process, PostgreSQL, and RabbitMQ through MassTransit. RabbitMQ is required outside `IntegrationTest`; local development uses the same durable transport as production-like environments.
+The deployable backend system consists of the API process, PostgreSQL, and a MassTransit transport. RabbitMQ is the durable target; local development can leave `RabbitMq:Host` empty to use in-memory transport.
 
 ```mermaid
 flowchart TB

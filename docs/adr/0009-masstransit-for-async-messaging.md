@@ -1,13 +1,13 @@
 # 9. Use MassTransit for asynchronous messaging
 
 Date: 2026-05-23
-Status: Accepted, amended 2026-05-30 and 2026-06-03
+Status: Accepted, amended 2026-05-30
 
 ## Context
 
 Appointment reminders and retention work must not block HTTP requests. The webhook stores appointment/reminder intent; delivery happens later when a reminder is due.
 
-The backend must support durable RabbitMQ transport in development, staging, and production so local testing validates the same queue behavior used after deployment.
+The backend must support durable RabbitMQ transport in production-like environments while still allowing lightweight local development.
 
 ## Decision
 
@@ -16,8 +16,8 @@ Use MassTransit as the .NET message bus abstraction.
 - `ReminderWorker` claims due `scheduled_reminders` from PostgreSQL.
 - It publishes `SendReminderCommand`.
 - `SendReminderConsumer` sends through the configured provider and writes delivery/audit state.
-- RabbitMQ is required outside `IntegrationTest`.
-- In-memory transport is allowed only for automated integration tests.
+- RabbitMQ is used when `RabbitMq:Host` is configured.
+- In-memory transport is allowed only for local development and tests.
 
 PostgreSQL remains the durable business ledger. RabbitMQ transports commands; it does not own appointment, reminder, retry, or audit truth.
 
@@ -37,4 +37,4 @@ PostgreSQL remains the durable business ledger. RabbitMQ transports commands; it
 - RabbitMQ provides durable transport and dead-letter behavior.
 - PostgreSQL retry fields make support/audit queries possible.
 - Every consumer must remain idempotent.
-- Local development validates RabbitMQ-specific behavior before staging.
+- Local in-memory transport does not validate RabbitMQ-specific failure behavior; staging smoke tests must use RabbitMQ.

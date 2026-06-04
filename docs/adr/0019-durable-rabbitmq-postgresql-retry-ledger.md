@@ -1,7 +1,7 @@
 # 19. Durable RabbitMQ transport with PostgreSQL retry ledger
 
 Date: 2026-05-30
-Status: Accepted, amended 2026-06-03
+Status: Accepted
 
 ## Context
 
@@ -11,7 +11,7 @@ The system also must avoid automatic provider fallback. Switching provider after
 
 ## Decision
 
-Use RabbitMQ through MassTransit for durable transport in every non-test runtime, and use PostgreSQL as the retry ledger and source of truth.
+Use RabbitMQ through MassTransit for durable transport in production-like environments, and use PostgreSQL as the retry ledger and source of truth.
 
 PostgreSQL stores:
 
@@ -22,9 +22,6 @@ PostgreSQL stores:
 - retry max delay;
 - last attempt timestamp;
 - next attempt timestamp;
-- queue message id;
-- queued timestamp;
-- consumed timestamp;
 - last error code;
 - provider message id;
 - sent timestamp.

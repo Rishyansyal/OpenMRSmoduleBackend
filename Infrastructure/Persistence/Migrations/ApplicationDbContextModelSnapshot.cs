@@ -374,10 +374,6 @@ namespace OpenMRSmoduleBackend.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("attempt_count");
 
-                    b.Property<DateTime?>("ConsumedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("consumed_at_utc");
-
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
@@ -416,14 +412,6 @@ namespace OpenMRSmoduleBackend.Infrastructure.Persistence.Migrations
                     b.Property<string>("ProviderMessageId")
                         .HasColumnType("text")
                         .HasColumnName("provider_message_id");
-
-                    b.Property<string>("QueueMessageId")
-                        .HasColumnType("text")
-                        .HasColumnName("queue_message_id");
-
-                    b.Property<DateTime?>("QueuedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("queued_at_utc");
 
                     b.Property<string>("ReminderWindow")
                         .IsRequired()

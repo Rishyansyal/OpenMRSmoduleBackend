@@ -63,9 +63,9 @@ Delivery is handled later:
 
 1. `ReminderWorker` claims due reminders from PostgreSQL.
 2. It publishes `SendReminderCommand` through MassTransit.
-3. Outside `IntegrationTest`, MassTransit uses RabbitMQ.
+3. In production-like environments, MassTransit uses RabbitMQ.
 4. `SendReminderConsumer` retrieves patient contact through OpenMRS FHIR and calls the selected provider.
-5. Queue message id, queued timestamp, consumed timestamp, success, provider message id, error code, attempt count, and next attempt state are retained in PostgreSQL.
+5. Success, provider message id, error code, attempt count, and next attempt state are retained in PostgreSQL.
 6. Repeated failures are retried according to the ledger and bus policy, then marked failed/dead-lettered.
 
 ## Example Request
