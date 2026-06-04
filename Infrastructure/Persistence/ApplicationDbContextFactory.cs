@@ -27,8 +27,8 @@ public class ApplicationDbContextFactory : IDesignTimeDbContextFactory<Applicati
     }
 }
 
-// Stub uitsluitend voor design-time EF Core tools (migrations).
-// Encrypt/decrypt worden niet aangeroepen tijdens migraties.
+// Stub exclusively for design-time EF Core tools. Encrypt/decrypt are not
+// executed while migrations are generated.
 internal sealed class NullEncryptionService : IEncryptionService
 {
     public string Encrypt(string plaintext) => plaintext;

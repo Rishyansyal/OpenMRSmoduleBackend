@@ -1,21 +1,25 @@
 # Security Policy
 
-## Supported Versions
+## Scope
 
-Use this section to tell people about which versions of your project are
-currently being supported with security updates.
+This backend handles OpenMRS appointment metadata, encrypted patient references, provider credentials, and reminder delivery state. Treat vulnerabilities affecting authentication, authorization, webhook validation, encryption, retention, or message delivery as security issues.
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 5.1.x   | :white_check_mark: |
-| 5.0.x   | :x:                |
-| 4.0.x   | :white_check_mark: |
-| < 4.0   | :x:                |
+## Reporting
 
-## Reporting a Vulnerability
+Report vulnerabilities privately to the deployment owner or repository maintainer. Do not include real patient data, credentials, webhook secrets, or production URLs in issue trackers.
 
-Use this section to tell people how to report a vulnerability.
+Include:
 
-Tell them where to go, how often they can expect to get an update on a
-reported vulnerability, what to expect if the vulnerability is accepted or
-declined, etc.
+- affected endpoint or component,
+- reproduction steps using synthetic data,
+- expected and actual behavior,
+- suggested severity,
+- relevant logs with secrets and patient data removed.
+
+## Deployment Baseline
+
+- Run behind HTTPS.
+- Use unique JWT, encryption, webhook, database, RabbitMQ, OpenMRS, and provider credentials.
+- Disable public registration unless explicitly required.
+- Restrict Swagger and metrics exposure at the reverse proxy when deployed outside a trusted network.
+- Keep RabbitMQ and PostgreSQL off public interfaces.

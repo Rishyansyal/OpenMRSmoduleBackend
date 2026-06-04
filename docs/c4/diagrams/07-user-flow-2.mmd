@@ -1,25 +1,22 @@
 flowchart TD
-    classDef start fill:#dcfce7,stroke:#166534,stroke-width:2px,color:#000
-    classDef action fill:#dbeafe,stroke:#1e40af,stroke-width:1px,color:#000
-    classDef decision fill:#fef3c7,stroke:#92400e,stroke-width:1px,color:#000
-    classDef error fill:#fee2e2,stroke:#991b1b,stroke-width:1px,color:#000
-    classDef done fill:#e0e7ff,stroke:#4338ca,stroke-width:2px,color:#000
+    classDef action fill:#d0ebff,stroke:#1971c2,color:#111
+    classDef decision fill:#fff3bf,stroke:#f08c00,color:#111
+    classDef done fill:#d3f9d8,stroke:#2b8a3e,color:#111
+    classDef error fill:#ffe3e3,stroke:#c92a2a,color:#111
 
-    Start([Klik 'Berichten' op dashboard]):::start
-    LoadProv["GET /api/messages/providers"]:::action
-    SelectProv["Selecteer provider<br/>(SwiftSend / SecurePost / LegacyLink / AsyncFlow)"]:::action
-    FillForm["Vul ontvangers, type (SMS/email/push) en bericht in"]:::action
-    Send["POST /api/messages"]:::action
-    Rate{"Rate limit<br/>(10/min)?"}:::decision
-    Provider{"Provider call<br/>succesvol?"}:::decision
-    Log["Message-log opgeslagen<br/>(provider, type, success, recipient_count)"]:::action
-    Result(["Toon resultaat in UI"]):::done
-    Err429(["⚠️ 429 — wacht 1 min"]):::error
-    ErrProv(["❌ Foutmelding tonen"]):::error
+    seed["Startup seeds admin from Admin:Email/Admin:Password"]:::action
+    login["POST /auth/login"]:::action
+    valid{"credentials valid?"}:::decision
+    token["JWT returned"]:::done
+    reject["401 Unauthorized"]:::error
+    register["POST /auth/register"]:::action
+    public{"AllowPublicRegistration?"}:::decision
+    forbid["403 PUBLIC_REGISTRATION_DISABLED"]:::error
 
-    Start --> LoadProv --> SelectProv --> FillForm --> Send
-    Send --> Rate
-    Rate -->|nee, limit hit| Err429
-    Rate -->|ja| Provider
-    Provider -->|ja| Log --> Result
-    Provider -->|nee| ErrProv
+    seed --> login
+    login --> valid
+    valid -->|yes| token
+    valid -->|no| reject
+    register --> public
+    public -->|no| forbid
+    public -->|yes| token

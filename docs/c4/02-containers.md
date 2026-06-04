@@ -1,30 +1,28 @@
-# C4 Level 2 — Containers
+# C4 Level 2 - Containers
 
-De technische bouwstenen van de OpenMRS Communicatiemodule.
+The deployable backend system consists of the API process, PostgreSQL, and RabbitMQ through MassTransit. RabbitMQ is required outside `IntegrationTest`; local development uses the same durable transport as production-like environments.
 
 ```mermaid
 flowchart TB
-    classDef person fill:#08427b,stroke:#073b6f,color:#fff
+    classDef ext fill:#767676,stroke:#525252,color:#fff
     classDef container fill:#1168bd,stroke:#0b4884,color:#fff
-    classDef db fill:#1168bd,stroke:#0b4884,color:#fff
-    classDef ext fill:#999999,stroke:#6b6b6b,color:#fff
+    classDef db fill:#0b7285,stroke:#07505c,color:#fff
+    classDef queue fill:#6741d9,stroke:#4c2ca3,color:#fff
 
-    zorg["👤 <b>Zorgmedewerker</b><br/><i>[Person]</i><br/>Gebruikt OpenMRS"]:::person
-    openmrs["<b>OpenMRS EMR</b><br/><i>[Extern systeem]</i><br/>FHIR R4 + webhooks<br/>:3032"]:::ext
-    providers["<b>Messaging Providers</b><br/><i>[Extern systeem]</i><br/>SwiftSend / SecurePost /<br/>LegacyLink / AsyncFlow"]:::ext
+    clinician["Clinician"]:::ext
+    openmrs["OpenMRS O3<br/>FHIR R4 + webhook source"]:::ext
+    providers["Messaging providers"]:::ext
 
-    subgraph module["OpenMRS Communicatiemodule"]
-        direction TB
-        api["<b>Backend API</b><br/><i>[Container: ASP.NET Core 10]</i><br/>REST + JWT + signed webhook,<br/>herinneringen, retentie — :5111"]:::container
-        db[("<b>Database</b><br/><i>[Container: PostgreSQL 17]</i><br/>Users, message_logs,<br/>reminder_logs — :5432")]:::db
-        bus["<b>Message Bus</b><br/><i>[Container: MassTransit]</i><br/>SendReminderCommand<br/>in-memory (dev) / RabbitMQ"]:::container
-
-        api -->|"Leest en schrijft<br/>[SQL / TCP]"| db
-        api <-->|"Publish / consume<br/>SendReminderCommand"| bus
+    subgraph backend["OpenMRS Communication Backend"]
+        api["ASP.NET Core API<br/>Controllers, JWT, webhook auth, workers, consumers"]:::container
+        pg[("PostgreSQL 17<br/>users, org config, webhook log, appointments, scheduled reminders, retry ledger, audit logs")]:::db
+        rabbit["RabbitMQ / MassTransit<br/>SendReminderCommand transport, retry, dead-letter"]:::queue
     end
 
-    zorg -->|"Gebruikt<br/>[HTTPS / :3032]"| openmrs
-    openmrs -->|"Signed appointment webhook<br/>[HTTPS / :5111]"| api
-    api -->|"FHIR R4 patiëntcontact<br/>[HTTPS / :3032]"| openmrs
-    api -->|"Verstuurt berichten<br/>[REST + SOAP / HTTPS]"| providers
+    clinician -->|"Uses"| openmrs
+    openmrs -->|"POST signed appointment event"| api
+    api -->|"FHIR R4 lookup"| openmrs
+    api -->|"SQL read/write"| pg
+    api -->|"Publish/consume reminder commands"| rabbit
+    api -->|"Send via configured provider"| providers
 ```

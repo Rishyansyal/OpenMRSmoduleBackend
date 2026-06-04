@@ -15,20 +15,26 @@ public class AsyncFlowProvider(
 
     public string ProviderName => "asyncflow";
 
-    public async Task<SendMessageResult> SendAsync(SendMessageRequest request, CancellationToken ct = default)
+    public async Task<SendMessageResult> SendAsync(
+        SendMessageRequest request,
+        MessageProviderConfiguration? configuration = null,
+        CancellationToken ct = default)
     {
         var failedRecipients = new List<string>();
         string? trackingId = null;
         string? lastError = null;
+        var baseUrl = configuration?.BaseUrl ?? _options.BaseUrl;
+        var apiKey = configuration?.GetCredential("apiKey") ?? _options.ApiKey;
+        var studentGroup = configuration?.StudentGroup ?? _studentGroup;
 
         foreach (var recipient in request.Recipients)
         {
             try
             {
                 var client = httpClientFactory.CreateClient();
-                using var httpRequest = new HttpRequestMessage(HttpMethod.Post, $"{_options.BaseUrl}/asyncflow");
-                httpRequest.Headers.Add("X-API-KEY", _options.ApiKey);
-                httpRequest.Headers.Add("X-STUDENT-GROUP", _studentGroup);
+                using var httpRequest = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/asyncflow");
+                httpRequest.Headers.Add("X-API-KEY", apiKey);
+                httpRequest.Headers.Add("X-STUDENT-GROUP", studentGroup);
                 httpRequest.Content = JsonContent.Create(new
                 {
                     destination = recipient,
@@ -64,12 +70,18 @@ public class AsyncFlowProvider(
         return new SendMessageResult(success, trackingId, success ? null : lastError, [.. failedRecipients]);
     }
 
-    public async Task<MessageStatusResult> GetStatusAsync(string trackingId, CancellationToken ct = default)
+    public async Task<MessageStatusResult> GetStatusAsync(
+        string trackingId,
+        MessageProviderConfiguration? configuration = null,
+        CancellationToken ct = default)
     {
+        var baseUrl = configuration?.BaseUrl ?? _options.BaseUrl;
+        var apiKey = configuration?.GetCredential("apiKey") ?? _options.ApiKey;
+        var studentGroup = configuration?.StudentGroup ?? _studentGroup;
         var client = httpClientFactory.CreateClient();
-        using var request = new HttpRequestMessage(HttpMethod.Get, $"{_options.BaseUrl}/asyncflow/{trackingId}");
-        request.Headers.Add("X-API-KEY", _options.ApiKey);
-        request.Headers.Add("X-STUDENT-GROUP", _studentGroup);
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"{baseUrl}/asyncflow/{trackingId}");
+        request.Headers.Add("X-API-KEY", apiKey);
+        request.Headers.Add("X-STUDENT-GROUP", studentGroup);
 
         var response = await client.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();

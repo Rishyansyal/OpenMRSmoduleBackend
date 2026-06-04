@@ -1,24 +1,30 @@
 # Architecture Decision Records
 
-Korte log van significante architectuurkeuzes voor deze backend. Iedere ADR beschrijft *één* beslissing in het format: **Context → Decision → Consequences**.
+Significant architecture choices for `OpenMRSmoduleBackend`.
 
-Nieuwe ADR? Kopieer een bestaande, verhoog het nummer, en zet de status op `Proposed` tot er consensus is.
+## Active Decisions
 
-## Index
+- [0001 - Record architecture decisions](0001-record-architecture-decisions.md)
+- [0003 - Use ASP.NET Core Identity for authentication](0003-use-identity-framework-for-auth.md)
+- [0004 - Use PostgreSQL as primary database](0004-use-postgresql.md)
+- [0005 - Use Docker for local development and deployment](0005-use-docker-for-deployment.md)
+- [0006 - Manage secrets outside tracked configuration](0006-secrets-via-env-file.md)
+- [0008 - Use signed webhooks for OpenMRS integration](0008-webhook-for-openmrs-integration.md)
+- [0009 - Use MassTransit for asynchronous messaging](0009-masstransit-for-async-messaging.md)
+- [0010 - Data retention and encryption policy](0010-data-retention-and-encryption-policy.md)
+- [0011 - Use a layered folder structure](0011-layered-folder-structure.md)
+- [0012 - Signed OpenMRS webhook contract](0012-signed-openmrs-webhook-contract.md)
+- [0013 - Pragmatic automated test strategy](0013-pragmatic-automated-test-strategy.md)
+- [0014 - CI quality gates](0014-ci-quality-gates.md)
+- [0015 - Encryption and webhook security posture](0015-encryption-and-webhook-security-posture.md)
+- [0016 - Observability via OpenTelemetry and Prometheus](0016-observability-stack.md)
+- [0017 - Asynchronous messaging as a separate component](0017-async-messaging-as-separate-component.md)
+- [0018 - Multi-OpenMRS hospital configuration](0018-multi-openmrs-hospital-configuration.md)
+- [0019 - Durable RabbitMQ transport with PostgreSQL retry ledger](0019-durable-rabbitmq-postgresql-retry-ledger.md)
+- [0020 - Use EF Core for application persistence](0020-use-ef-core-for-persistence.md)
+- [0021 - Require RabbitMQ outside integration tests](0021-require-rabbitmq-outside-integration-tests.md)
+- [0022 - Privacy-safe reminder delivery evidence](0022-privacy-safe-reminder-delivery-evidence.md)
 
-- [0001 — Record architecture decisions](0001-record-architecture-decisions.md)
-- [0002 — Use Dapper as ORM](0002-use-dapper-as-orm.md)
-- [0003 — Use ASP.NET Core Identity for authentication](0003-use-identity-framework-for-auth.md)
-- [0004 — Use PostgreSQL as primary database](0004-use-postgresql.md)
-- [0005 — Use Docker for local dev and deployment](0005-use-docker-for-deployment.md)
-- [0006 — Manage secrets via .env (gitignored)](0006-secrets-via-env-file.md)
-- [0008 — Use webhooks for OpenMRS integration, not polling APIs](0008-webhook-for-openmrs-integration.md)
-- [0009 — Use MassTransit for asynchronous messaging and background services](0009-masstransit-for-async-messaging.md)
-- [0010 — Data retention and encryption policy for sensitive appointment data](0010-data-retention-and-encryption-policy.md)
-- [0011 — Use a layered folder structure within a single project](0011-layered-folder-structure.md)
-- [0012 — Signed OpenMRS webhook contract](0012-signed-openmrs-webhook-contract.md)
-- [0013 — Pragmatic automated test strategy](0013-pragmatic-automated-test-strategy.md)
-- [0014 — CI quality gates](0014-ci-quality-gates.md)
-- [0015 — Encryption and webhook security posture](0015-encryption-and-webhook-security-posture.md)
-- [0016 — Observability via OpenTelemetry en Prometheus](0016-observability-stack.md)
-- [0017 — Asynchroon messaging-component als apart, los te schalen deel](0017-async-messaging-as-separate-component.md)
+## Superseded Decisions
+
+- [0002 - Use Dapper as ORM](0002-use-dapper-as-orm.md), superseded by ADR 0020.

@@ -52,21 +52,38 @@ public class ReminderWorker(
 
         foreach (var reminder in due)
         {
-            await bus.Publish(new SendReminderCommand(
-                reminder.ScheduledReminderId,
-                reminder.OrganizationId,
-                reminder.EncounterId,
-                reminder.PatientId,
-                reminder.ReminderWindow,
-                reminder.EncounterStart,
-                reminder.ServiceType,
-                reminder.Provider,
-                reminder.Location,
-                reminder.Instructions), ct);
+            var messageId = NewId.NextGuid();
+            await scheduledReminders.RecordQueuePublishAsync(reminder.ScheduledReminderId, messageId, ct);
 
-            published++;
-            logger.LogDebug("SendReminderCommand gepubliceerd: encounter {id}, venster {window}.",
-                reminder.EncounterId, reminder.ReminderWindow);
+            try
+            {
+                await bus.Publish(new SendReminderCommand(
+                    reminder.ScheduledReminderId,
+                    reminder.OrganizationId,
+                    reminder.EncounterId,
+                    reminder.PatientId,
+                    reminder.ReminderWindow,
+                    reminder.EncounterStart,
+                    reminder.ServiceType,
+                    reminder.Provider,
+                    reminder.AttemptCount,
+                    reminder.MaxAttempts,
+                    reminder.Location,
+                    reminder.Instructions), context => context.MessageId = messageId, ct);
+
+                published++;
+                logger.LogDebug("SendReminderCommand gepubliceerd: reminder {id}, venster {window}, queue message {messageId}.",
+                    reminder.ScheduledReminderId, reminder.ReminderWindow, messageId);
+            }
+            catch (Exception ex)
+            {
+                await scheduledReminders.RecordQueuePublishFailureAsync(
+                    reminder.ScheduledReminderId,
+                    "QUEUE_PUBLISH_FAILED",
+                    ct);
+                logger.LogError(ex, "Kon reminder {id} niet naar RabbitMQ publiceren.",
+                    reminder.ScheduledReminderId);
+            }
         }
 
         if (published > 0)

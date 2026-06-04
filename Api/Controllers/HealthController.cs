@@ -1,13 +1,13 @@
-using Dapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace Api.Controllers;
 
 [ApiController]
 [Route("[controller]")]
-public class HealthController(IDbConnectionFactory connectionFactory) : ControllerBase
+public class HealthController(ApplicationDbContext db) : ControllerBase
 {
     /// <summary>Publiek health-check endpoint voor load balancers en orchestrators.</summary>
     [AllowAnonymous]
@@ -21,10 +21,8 @@ public class HealthController(IDbConnectionFactory connectionFactory) : Controll
     [HttpGet("db")]
     public async Task<IActionResult> GetDb(CancellationToken ct)
     {
-        using var connection = await connectionFactory.CreateConnectionAsync(ct);
-        var result = await connection.ExecuteScalarAsync<int>(
-            new CommandDefinition("SELECT 1", cancellationToken: ct));
-        return Ok(new { status = "Healthy", db = result == 1 ? "reachable" : "unreachable" });
+        var reachable = await db.Database.CanConnectAsync(ct);
+        return Ok(new { status = "Healthy", db = reachable ? "reachable" : "unreachable" });
     }
 }
 

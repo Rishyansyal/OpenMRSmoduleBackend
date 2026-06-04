@@ -27,11 +27,21 @@ public class LegacyLinkProvider : IMessageProvider
             Encoding.UTF8.GetBytes($"{_options.Username}:{_options.Password}"));
     }
 
-    public async Task<SendMessageResult> SendAsync(SendMessageRequest request, CancellationToken ct = default)
+    public async Task<SendMessageResult> SendAsync(
+        SendMessageRequest request,
+        MessageProviderConfiguration? configuration = null,
+        CancellationToken ct = default)
     {
         var failedRecipients = new List<string>();
         string? lastReference = null;
         string? lastError = null;
+        var baseUrl = configuration?.BaseUrl ?? _options.BaseUrl;
+        var studentGroup = configuration?.StudentGroup ?? _studentGroup;
+        var username = configuration?.GetCredential("username") ?? _options.Username;
+        var password = configuration?.GetCredential("password") ?? _options.Password;
+        var basicAuth = configuration is null
+            ? _basicAuth
+            : Convert.ToBase64String(Encoding.UTF8.GetBytes($"{username}:{password}"));
 
         var ns = XNamespace.Get("http://legacylink.fakecomworld.com/v1");
 
@@ -47,9 +57,9 @@ public class LegacyLinkProvider : IMessageProvider
                         new XElement(ns + "SenderIdentification", "OpenMRS")));
 
                 var client = _httpClientFactory.CreateClient();
-                using var httpRequest = new HttpRequestMessage(HttpMethod.Post, $"{_options.BaseUrl}/LegacyLink/SendSms");
-                httpRequest.Headers.Add("Authorization", $"Basic {_basicAuth}");
-                httpRequest.Headers.Add("X-STUDENT-GROUP", _studentGroup);
+                using var httpRequest = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/LegacyLink/SendSms");
+                httpRequest.Headers.Add("Authorization", $"Basic {basicAuth}");
+                httpRequest.Headers.Add("X-STUDENT-GROUP", studentGroup);
                 httpRequest.Headers.Add("Accept", "application/xml");
                 httpRequest.Content = new StringContent(doc.ToString(), Encoding.UTF8, "application/xml");
 

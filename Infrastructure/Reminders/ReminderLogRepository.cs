@@ -22,9 +22,18 @@ public class ReminderLogRepository(ApplicationDbContext db, IEncryptionService e
         await db.SaveChangesAsync(ct);
     }
 
-    public async Task<IEnumerable<ReminderLog>> GetRecentAsync(int count = 50, CancellationToken ct = default) =>
+    public async Task<IEnumerable<ReminderLogOverview>> GetRecentAsync(int count = 50, CancellationToken ct = default) =>
         await db.ReminderLogs
             .OrderByDescending(r => r.SentAt)
             .Take(count)
+            .Select(r => new ReminderLogOverview(
+                r.Id,
+                r.EncounterIdHash,
+                r.ReminderWindow,
+                r.Provider,
+                r.Success,
+                r.ErrorCode,
+                r.EncounterStart,
+                r.SentAt))
             .ToListAsync(ct);
 }

@@ -2,8 +2,10 @@ namespace Application.Webhooks;
 
 public interface IOpenMrsWebhookSignatureValidator
 {
-    WebhookSignatureValidationResult Validate(
+    Task<WebhookSignatureValidationResult> ValidateAsync(
+        string? organizationId,
         string? timestampHeader,
         string? signatureHeader,
-        string body);
+        string body,
+        CancellationToken ct = default);
 }

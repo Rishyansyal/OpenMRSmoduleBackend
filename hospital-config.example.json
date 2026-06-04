@@ -1,0 +1,34 @@
+{
+  "HospitalConfiguration": {
+    "Organizations": [
+      {
+        "OrganizationId": "hospital-a",
+        "OpenMrsBaseUrl": "http://host.docker.internal:3032",
+        "OpenMrsUsername": "openmrs-service-account",
+        "OpenMrsPassword": "replace-me",
+        "WebhookSecret": "replace-with-a-long-random-secret",
+        "Enabled": true,
+        "DefaultProvider": "swiftsend",
+        "TimeZoneId": "Europe/Amsterdam",
+        "PollerEnabled": true,
+        "PollerIntervalMinutes": 5,
+        "PollerLookaheadHours": 48,
+        "MaxDeliveryAttempts": 288,
+        "RetryBaseDelaySeconds": 60,
+        "RetryMaxDelayMinutes": 60,
+        "Providers": [
+          {
+            "ProviderName": "swiftsend",
+            "Enabled": true,
+            "BaseUrl": "http://host.docker.internal:1337",
+            "StudentGroup": "replace-me",
+            "Credentials": {
+              "apiKey": "replace-me"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
+

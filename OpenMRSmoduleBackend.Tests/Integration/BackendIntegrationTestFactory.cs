@@ -27,13 +27,16 @@ public sealed class BackendIntegrationTestFactory : WebApplicationFactory<Progra
         SetEnvironment("Database__Provider", "Sqlite");
         SetEnvironment("Database__RunMigrations", "false");
         SetEnvironment("Jwt__Issuer", "OpenMRSmoduleBackend.IntegrationTests");
-        SetEnvironment("Jwt__Audience", "OpenMRSmoduleFrontend.IntegrationTests");
+        SetEnvironment("Jwt__Audience", "OpenMRSmoduleBackend.IntegrationTests");
         SetEnvironment("Jwt__SecretKey", TestJwtSecret);
         SetEnvironment("Encryption__Key", TestEncryptionKey);
         SetEnvironment("Security__EncryptionKey", TestEncryptionKey);
         SetEnvironment("Webhooks__OpenMrs__Secret", OpenMrsWebhookSecret);
         SetEnvironment("Webhooks__OpenMrs__AllowedClockSkewMinutes", "5");
         SetEnvironment("Reminders__DefaultProvider", "SwiftSend");
+        SetEnvironment("Admin__AllowPublicRegistration", "true");
+        SetEnvironment("Admin__SeedOnStartup", "false");
+        SetEnvironment("HospitalConfiguration__SeedOnStartup", "false");
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -47,13 +50,16 @@ public sealed class BackendIntegrationTestFactory : WebApplicationFactory<Progra
                 ["Database:Provider"] = "Sqlite",
                 ["Database:RunMigrations"] = "false",
                 ["Jwt:Issuer"] = "OpenMRSmoduleBackend.IntegrationTests",
-                ["Jwt:Audience"] = "OpenMRSmoduleFrontend.IntegrationTests",
+                ["Jwt:Audience"] = "OpenMRSmoduleBackend.IntegrationTests",
                 ["Jwt:SecretKey"] = TestJwtSecret,
                 ["Encryption:Key"] = TestEncryptionKey,
                 ["Security:EncryptionKey"] = TestEncryptionKey,
                 ["Webhooks:OpenMrs:Secret"] = OpenMrsWebhookSecret,
                 ["Webhooks:OpenMrs:AllowedClockSkewMinutes"] = "5",
-                ["Reminders:DefaultProvider"] = "SwiftSend"
+                ["Reminders:DefaultProvider"] = "SwiftSend",
+                ["Admin:AllowPublicRegistration"] = "true",
+                ["Admin:SeedOnStartup"] = "false",
+                ["HospitalConfiguration:SeedOnStartup"] = "false"
             });
         });
 
@@ -79,6 +85,27 @@ public sealed class BackendIntegrationTestFactory : WebApplicationFactory<Progra
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         await db.Database.EnsureDeletedAsync();
         await db.Database.EnsureCreatedAsync();
+        await SeedOrganizationAsync(scope.ServiceProvider, db);
+    }
+
+    private static async Task SeedOrganizationAsync(IServiceProvider services, ApplicationDbContext db)
+    {
+        var encryption = services.GetRequiredService<IFieldEncryptionService>();
+        db.OrganizationIntegrationConfigs.Add(new Domain.OrganizationIntegrationConfig
+        {
+            OrganizationId = "lu1",
+            OpenMrsBaseUrl = "http://openmrs.test",
+            OpenMrsUsernameEncrypted = encryption.Encrypt("openmrs-user"),
+            OpenMrsPasswordEncrypted = encryption.Encrypt("openmrs-password"),
+            WebhookSecretEncrypted = encryption.Encrypt(OpenMrsWebhookSecret),
+            Enabled = true,
+            DefaultProvider = "SwiftSend",
+            TimeZoneId = "UTC",
+            MaxDeliveryAttempts = 10,
+            RetryBaseDelaySeconds = 60,
+            RetryMaxDelayMinutes = 60
+        });
+        await db.SaveChangesAsync();
     }
 
     protected override void Dispose(bool disposing)

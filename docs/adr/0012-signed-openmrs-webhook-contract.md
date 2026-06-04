@@ -1,42 +1,30 @@
 # 12. Signed OpenMRS webhook contract
 
 Date: 2026-05-23
-
-## Status
-
-Accepted
+Status: Accepted, amended 2026-05-30
 
 ## Context
 
-De communicatiemodule moet gewijzigde en geannuleerde afspraken uit OpenMRS direct verwerken. Polling past niet bij ADR 0008 omdat updates dan vertraagd zijn en extra load veroorzaken.
+OpenMRS appointment changes must reach the backend quickly and securely. The
+backend supports multiple OpenMRS hospital deployments.
 
 ## Decision
 
-OpenMRS stuurt appointment/Encounter-events naar `POST /api/webhooks/openmrs/appointments`.
+OpenMRS posts events to `POST /api/webhooks/openmrs/appointments` with:
 
-Iedere request bevat:
+- `X-OpenMRS-Event-Id`;
+- `X-OpenMRS-Event-Type`;
+- `X-OpenMRS-Timestamp`;
+- `X-OpenMRS-Organization-Id`;
+- `X-OpenMRS-Signature: sha256=<hex>`.
 
-- `X-OpenMRS-Event-Id`
-- `X-OpenMRS-Event-Type`
-- `X-OpenMRS-Timestamp`
-- `X-OpenMRS-Organization-Id`
-- `X-OpenMRS-Signature: sha256=<hex>`
-
-De signature is HMAC-SHA256 over `timestamp + "." + rawBody`. De backend verwerpt ontbrekende of ongeldige signatures, timestamps buiten de clock-skew en dubbele event-id's.
-
-## Overwogen alternatieven
-
-| Alternatief | Reden van afval |
-|---|---|
-| **Geen authenticatie, alleen TLS** | Iedereen die het endpoint kent kan webhooks injecteren; ongeacceptabel voor patiëntdata. |
-| **Shared bearer token in header** | Vatbaar voor replay-attacks zodra het token gelogd of gelekt is; geen timestamp- of body-binding. HMAC + timestamp lost dit op. |
-| **Mutual TLS (mTLS)** | Sterke authenticatie, maar vereist certificate-management aan OpenMRS-zijde dat de huidige OpenMRS-webhookmodule niet ondersteunt zonder fors uitbreiden. Pragmatisch nu te zwaar. |
-| **OAuth2 client_credentials grant** | Zou werken, maar voegt een token-endpoint en token-cache toe tussen twee systemen die elkaar al direct kennen. Disproportioneel. |
-| **IP-allowlist op de reverse proxy** | Brittle (NAT, dynamische IP's bij hosted OpenMRS, multi-tenant deployments); geen integriteitsgarantie op de body. Hooguit een **extra** verdediging bovenop HMAC, niet als enige. |
-| **Asymmetrische signing (RSA / Ed25519)** | Voorkomt dat de backend de webhook ook zou kunnen *produceren*, maar voor een one-way integratie zonder verdere claims onnodige complexiteit. Symmetrische HMAC is industriestandaard hiervoor (zie GitHub, Stripe, Slack). |
+The signature is HMAC-SHA256 over `timestamp + "." + rawBody`. The backend
+rejects missing or invalid signatures, unknown organizations, and timestamps
+outside the allowed clock skew. Duplicate event IDs are accepted idempotently
+without scheduling duplicate work.
 
 ## Consequences
 
-- OpenMRS en backend delen een webhook-secret per omgeving.
-- Idempotency zit in de backend op `event_id`; dubbele events worden `200 OK` met `Duplicate = true`.
-- OpenMRS houdt een outbox bij wanneer de backend tijdelijk niet bereikbaar is.
+- Each OpenMRS organization has its own webhook secret.
+- The OpenMRS OMOD persists failed deliveries in its outbox for retry.
+- TLS remains required at the deployment boundary.

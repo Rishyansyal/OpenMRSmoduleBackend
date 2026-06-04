@@ -1,6 +1,25 @@
-@OpenMRSmoduleBackend_HostAddress = http://localhost:5111
+@host = http://localhost:5111
+@token = replace-with-jwt
 
-GET {{OpenMRSmoduleBackend_HostAddress}}/weatherforecast/
+GET {{host}}/health
+Accept: application/json
+###
+
+GET {{host}}/health/readiness
 Accept: application/json
 
 ###
+
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@example.test",
+  "password": "replace-with-admin-password"
+}
+
+###
+
+GET {{host}}/api/reminders/dead-lettered
+Authorization: Bearer {{token}}
+Accept: application/json

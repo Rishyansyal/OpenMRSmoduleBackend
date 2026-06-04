@@ -1,5 +1,6 @@
-bin/
-obj/
+**/bin/
+**/obj/
+OpenMRSmoduleBackend.Tests/
 .vs/
 .vscode/
 .idea/
