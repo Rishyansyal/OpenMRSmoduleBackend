@@ -1,6 +1,10 @@
 # Lokale ontwikkeling — zet de DB-poort open zodat GUI-tools (TablePlus, DBeaver, pgAdmin)
 # er direct bij kunnen. Dit bestand nooit committen.
 services:
+  rabbitmq:
+    ports:
+      - "127.0.0.1:15672:15672"
+
   db:
     ports:
       - "127.0.0.1:5432:5432"

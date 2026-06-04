@@ -37,4 +37,13 @@ cd ../OpenMRSmoduleBackend
 docker compose up -d --build
 ```
 
-Verify OpenMRS O3 loads, appointment creation succeeds, signed webhooks reach the backend, RabbitMQ is healthy, and a simulated provider outage is retried after recovery.
+Verify OpenMRS O3 loads, appointment creation succeeds, signed webhooks reach the backend, RabbitMQ is healthy, and a simulated provider outage is retried after recovery. RabbitMQ is required outside `IntegrationTest`; local development no longer falls back to in-memory MassTransit.
+
+OpenMRS O3 smoke check:
+
+```powershell
+cd ../2.4-LU1-openMRS-Avans
+.\tests\smoke\openmrs-spa-smoke.ps1
+```
+
+The smoke check verifies `/openmrs` redirects to O3, `/openmrs/legacy` redirects to the legacy login page, SPA assets are reachable, runtime placeholders are resolved, and browser console errors are absent when Playwright is available.

@@ -18,6 +18,9 @@ public class ScheduledReminder
     public int RetryMaxDelayMinutes { get; set; } = 60;
     public DateTime? LastAttemptAtUtc { get; set; }
     public DateTime? NextAttemptAtUtc { get; set; }
+    public string? QueueMessageId { get; set; }
+    public DateTime? QueuedAtUtc { get; set; }
+    public DateTime? ConsumedAtUtc { get; set; }
     public string? ProviderMessageId { get; set; }
     public DateTime? SentAtUtc { get; set; }
     public DateTime CreatedAtUtc { get; init; } = DateTime.UtcNow;

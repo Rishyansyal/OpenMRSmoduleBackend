@@ -22,6 +22,8 @@ Significant architecture choices for `OpenMRSmoduleBackend`.
 - [0018 - Multi-OpenMRS hospital configuration](0018-multi-openmrs-hospital-configuration.md)
 - [0019 - Durable RabbitMQ transport with PostgreSQL retry ledger](0019-durable-rabbitmq-postgresql-retry-ledger.md)
 - [0020 - Use EF Core for application persistence](0020-use-ef-core-for-persistence.md)
+- [0021 - Require RabbitMQ outside integration tests](0021-require-rabbitmq-outside-integration-tests.md)
+- [0022 - Privacy-safe reminder delivery evidence](0022-privacy-safe-reminder-delivery-evidence.md)
 
 ## Superseded Decisions
 

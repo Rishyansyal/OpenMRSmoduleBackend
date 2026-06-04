@@ -29,9 +29,9 @@ See [C4 containers](c4/02-containers.md).
 |---|---|
 | ASP.NET Core API | JWT auth, webhook validation, OpenMRS/FHIR calls, reminder workers, MassTransit consumers, provider adapters. |
 | PostgreSQL | Users, organization config, provider config, appointment state, scheduled reminders, retry ledger fields, message logs, webhook logs. |
-| RabbitMQ / MassTransit | Durable production command transport for reminder delivery. |
+| RabbitMQ / MassTransit | Required non-test command transport for reminder delivery. |
 
-Local development may use MassTransit in-memory transport when `RabbitMq:Host` is empty. Durable environments must configure RabbitMQ credentials.
+Local development uses RabbitMQ as well. Only the `IntegrationTest` environment may use MassTransit in-memory transport.
 
 ## 4. Configuration And Multi-OpenMRS
 
@@ -65,9 +65,9 @@ The webhook stores intent only. It does not call providers. The worker/consumer 
 
 1. `ReminderWorker` claims due reminders from PostgreSQL.
 2. It publishes `SendReminderCommand`.
-3. RabbitMQ transports commands in production.
+3. RabbitMQ transports commands outside integration tests.
 4. `SendReminderConsumer` performs FHIR lookup and provider send.
-5. PostgreSQL records `attempt_count`, `max_attempts`, retry delay settings, last/next attempt timestamps, provider message id, status, and audit logs.
+5. PostgreSQL records queue message id, queued/consumed timestamps, `attempt_count`, `max_attempts`, retry delay settings, last/next attempt timestamps, provider message id, status, and audit logs.
 
 Provider fallback is intentionally not automatic. A reminder uses the provider selected by the organization/default configuration. If that provider fails, the system retries the same provider, then records failure/dead-letter state.
 

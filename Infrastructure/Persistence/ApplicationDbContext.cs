@@ -86,6 +86,9 @@ public class ApplicationDbContext(
             e.Property(r => r.RetryMaxDelayMinutes).HasColumnName("retry_max_delay_minutes");
             e.Property(r => r.LastAttemptAtUtc).HasColumnName("last_attempt_at_utc");
             e.Property(r => r.NextAttemptAtUtc).HasColumnName("next_attempt_at_utc");
+            e.Property(r => r.QueueMessageId).HasColumnName("queue_message_id");
+            e.Property(r => r.QueuedAtUtc).HasColumnName("queued_at_utc");
+            e.Property(r => r.ConsumedAtUtc).HasColumnName("consumed_at_utc");
             e.Property(r => r.ProviderMessageId).HasColumnName("provider_message_id");
             e.Property(r => r.SentAtUtc).HasColumnName("sent_at_utc");
             e.Property(r => r.CreatedAtUtc).HasColumnName("created_at_utc");

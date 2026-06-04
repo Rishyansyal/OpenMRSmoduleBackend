@@ -3,7 +3,7 @@ namespace Application.Reminders;
 public record ScheduledReminderOverview(
     Guid Id,
     string OrganizationId,
-    string EncounterId,
+    string EncounterReferenceHash,
     string ReminderWindow,
     DateTime ScheduledForUtc,
     DateTime EncounterStartUtc,
@@ -15,4 +15,7 @@ public record ScheduledReminderOverview(
     int MaxAttempts,
     DateTime? LastAttemptAtUtc,
     DateTime? NextAttemptAtUtc,
+    string? QueueMessageId,
+    DateTime? QueuedAtUtc,
+    DateTime? ConsumedAtUtc,
     string? ProviderMessageId);
