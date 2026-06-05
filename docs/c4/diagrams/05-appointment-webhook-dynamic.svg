@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1550" height="950" viewBox="0 0 1550 950">
+  
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="10" refX="11" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L 12 5 L 0 10 z" fill="#707070" />
+    </marker>
+  </defs>
+  <rect width="100%" height="100%" fill="white"/>
+  
+    <rect x="345" y="130" width="800" height="650" rx="0" fill="none" stroke="#999999" stroke-width="2" stroke-dasharray="9 9"/>
+    <text x="355" y="746" text-anchor="start" style="font-size:13px;font-weight:700;fill:#333333;font-style:normal">OpenMRS Appointment Reminder Platform</text>
+    <text x="355" y="764" text-anchor="start" style="font-size:10px;font-weight:400;fill:#333333;font-style:italic">[Software System]</text>
+  <path d="M 290 200 L 405 252.5" fill="none" stroke="#707070" stroke-width="2" stroke-dasharray="10 10" marker-end="url(#arrow)"/>
+<path d="M 665 252.5 L 805 252.5" fill="none" stroke="#707070" stroke-width="2" stroke-dasharray="10 10" marker-end="url(#arrow)"/>
+<path d="M 935 315 L 935 500" fill="none" stroke="#707070" stroke-width="2" stroke-dasharray="10 10" marker-end="url(#arrow)"/>
+<path d="M 805 562.5 L 665 567.5" fill="none" stroke="#707070" stroke-width="2" stroke-dasharray="10 10" marker-end="url(#arrow)"/>
+<path d="M 935 625 L 935 690 L 535 690 L 535 635" fill="none" stroke="#707070" stroke-width="2" stroke-dasharray="10 10" marker-end="url(#arrow)"/>
+<path d="M 1065 252.5 L 1190 252.5" fill="none" stroke="#707070" stroke-width="2" stroke-dasharray="10 10" marker-end="url(#arrow)"/>
+  
+    <circle cx="175" cy="154" r="32" fill="#438d12" stroke="#438d12" stroke-width="2"/>
+    <rect x="76" y="192" width="198" height="88" rx="42" fill="#438d12" stroke="#438d12" stroke-width="2"/>
+    <text x="175" y="226" text-anchor="middle" style="font-size:17px;font-weight:700;fill:#ffffff;font-style:normal">Clinician</text>
+    <text x="175" y="247" text-anchor="middle" style="font-size:10px;font-weight:400;fill:#ffffff;font-style:italic">[Person]</text>
+    <text x="175" y="268" text-anchor="middle" style="font-size:11px;font-weight:400;fill:#ffffff;font-style:normal">Changes appointment.</text>
+
+    <g id="openmrs">
+      <rect x="405" y="190" width="260" height="125" rx="0" fill="#85bb57" stroke="#85bb57" stroke-width="2"/>
+      <text x="535" y="230" text-anchor="middle" style="font-size:17px;font-weight:700;fill:#ffffff;font-style:normal">OpenMRS Backend</text>
+      <text x="535" y="252" text-anchor="middle" style="font-size:10px;font-weight:400;fill:#ffffff;font-style:italic">[Container: Java/Tomcat]</text>
+      <text x="535" y="274" text-anchor="middle" style="font-size:11px;font-weight:400;fill:#ffffff;font-style:normal">Publishes Encounter event.</text>
+    </g>
+
+    <g id="omod">
+      <rect x="805" y="190" width="260" height="125" rx="0" fill="#85bb57" stroke="#85bb57" stroke-width="2"/>
+      <text x="935" y="230" text-anchor="middle" style="font-size:17px;font-weight:700;fill:#ffffff;font-style:normal">Webhook Module</text>
+      <text x="935" y="252" text-anchor="middle" style="font-size:10px;font-weight:400;fill:#ffffff;font-style:italic">[Component: OMOD]</text>
+      <text x="935" y="274" text-anchor="middle" style="font-size:11px;font-weight:400;fill:#ffffff;font-style:normal">Builds and signs event JSON.</text>
+    </g>
+
+    <g id="api">
+      <rect x="805" y="500" width="260" height="125" rx="0" fill="#85bb57" stroke="#85bb57" stroke-width="2"/>
+      <text x="935" y="540" text-anchor="middle" style="font-size:17px;font-weight:700;fill:#ffffff;font-style:normal">Webhook Endpoint</text>
+      <text x="935" y="562" text-anchor="middle" style="font-size:10px;font-weight:400;fill:#ffffff;font-style:italic">[Component: ASP.NET Core]</text>
+      <text x="935" y="584" text-anchor="middle" style="font-size:11px;font-weight:400;fill:#ffffff;font-style:normal">Validates and accepts event.</text>
+    </g>
+
+    <g id="db">
+      
+    <path d="M 413 522 C 413 504, 657 504, 657 522
+             L 657 613
+             C 657 631, 413 631, 413 613
+             Z" fill="#85bb57" stroke="#85bb57" stroke-width="2"/>
+    <ellipse cx="535" cy="522" rx="122" ry="18" fill="#85bb57" stroke="#85bb57" stroke-width="2"/>
+    <ellipse cx="535" cy="522" rx="122" ry="18" fill="none" stroke="rgba(0,0,0,0.16)" stroke-width="1"/>
+      <text x="535" y="540.5" text-anchor="middle" style="font-size:17px;font-weight:700;fill:#ffffff;font-style:normal">Communication Database</text>
+      <text x="535" y="562.5" text-anchor="middle" style="font-size:10px;font-weight:400;fill:#ffffff;font-style:italic">[Container: PostgreSQL]</text>
+      <text x="535" y="584.5" text-anchor="middle" style="font-size:11px;font-weight:400;fill:#ffffff;font-style:normal">Webhook log, appointment,</text>
+<text x="535" y="598.5" text-anchor="middle" style="font-size:11px;font-weight:400;fill:#ffffff;font-style:normal">scheduled reminders.</text>
+    </g>
+
+    <g id="outbox">
+      <rect x="1190" y="190" width="260" height="125" rx="0" fill="#85bb57" stroke="#85bb57" stroke-width="2"/>
+      <text x="1320" y="230" text-anchor="middle" style="font-size:17px;font-weight:700;fill:#ffffff;font-style:normal">Webhook Outbox</text>
+      <text x="1320" y="252" text-anchor="middle" style="font-size:10px;font-weight:400;fill:#ffffff;font-style:italic">[Component: JSONL file]</text>
+      <text x="1320" y="274" text-anchor="middle" style="font-size:11px;font-weight:400;fill:#ffffff;font-style:normal">Stores failed sends.</text>
+    </g>
+  <g>
+      <text x="335" y="185" text-anchor="middle" style="font-size:11px;font-weight:400;fill:#333333;font-style:normal">1: Creates or updates</text>
+<text x="335" y="199" text-anchor="middle" style="font-size:11px;font-weight:400;fill:#333333;font-style:normal">appointment</text>
+      <text x="335" y="213" text-anchor="middle" style="font-size:10px;font-weight:400;fill:#333333;font-style:italic">[OpenMRS O3]</text>
+    </g>
+<g>
+      <text x="735" y="220" text-anchor="middle" style="font-size:11px;font-weight:400;fill:#333333;font-style:normal">2: Publishes Encounter</text>
+<text x="735" y="234" text-anchor="middle" style="font-size:11px;font-weight:400;fill:#333333;font-style:normal">event</text>
+      <text x="735" y="248" text-anchor="middle" style="font-size:10px;font-weight:400;fill:#333333;font-style:italic">[event-api/JMS]</text>
+    </g>
+<g>
+      <text x="935" y="405" text-anchor="middle" style="font-size:11px;font-weight:400;fill:#333333;font-style:normal">3: Posts signed webhook</text>
+      <text x="935" y="419" text-anchor="middle" style="font-size:10px;font-weight:400;fill:#333333;font-style:italic">[HTTPS/JSON + HMAC]</text>
+    </g>
+<g>
+      <text x="735" y="500" text-anchor="middle" style="font-size:11px;font-weight:400;fill:#333333;font-style:normal">4: Reads organization</text>
+<text x="735" y="514" text-anchor="middle" style="font-size:11px;font-weight:400;fill:#333333;font-style:normal">secret</text>
+      <text x="735" y="528" text-anchor="middle" style="font-size:10px;font-weight:400;fill:#333333;font-style:italic">[SQL/TCP]</text>
+    </g>
+<g>
+      <text x="735" y="715" text-anchor="middle" style="font-size:11px;font-weight:400;fill:#333333;font-style:normal">5: Writes event, appointment,</text>
+<text x="735" y="729" text-anchor="middle" style="font-size:11px;font-weight:400;fill:#333333;font-style:normal">and reminders</text>
+      <text x="735" y="743" text-anchor="middle" style="font-size:10px;font-weight:400;fill:#333333;font-style:italic">[SQL/TCP]</text>
+    </g>
+<g>
+      <text x="1130" y="245" text-anchor="middle" style="font-size:11px;font-weight:400;fill:#333333;font-style:normal">Failure path: queues</text>
+<text x="1130" y="259" text-anchor="middle" style="font-size:11px;font-weight:400;fill:#333333;font-style:normal">failed post</text>
+      <text x="1130" y="273" text-anchor="middle" style="font-size:10px;font-weight:400;fill:#333333;font-style:italic">[filesystem]</text>
+    </g>
+  <text x="20" y="898" text-anchor="start" style="font-size:19px;font-weight:700;fill:#333333;font-style:normal">Dynamic View: Signed appointment webhook scheduling</text>
+  <text x="20" y="920" text-anchor="start" style="font-size:11px;font-weight:400;fill:#707070;font-style:normal">Numbered relationships show runtime order for the appointment change scenario.</text>
+</svg>

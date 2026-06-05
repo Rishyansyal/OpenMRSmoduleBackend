@@ -1,12 +1,12 @@
-# Architecture Report - OpenMRS Communication Backend
+# Architecture Report - OpenMRS Appointment Reminder Platform
 
-**Status:** current backend architecture
-**Scope:** `OpenMRSmoduleBackend` plus OpenMRS O3 integration
+**Status:** current platform architecture
+**Scope:** `OpenMRSmoduleBackend`, the OpenMRS O3 distro in `../2.4-LU1-openMRS-Avans`, and the custom OpenMRS appointment webhook module
 **Out of scope:** the removed custom Next.js frontend
 
 ## 1. Purpose
 
-OpenMRS O3 is the clinical user interface and patient-record system. This backend adds communication capabilities around it:
+OpenMRS O3 is the clinical user interface and patient-record system. The communication backend adds reminder capabilities around it:
 
 - receive signed OpenMRS appointment events;
 - schedule 24-hour and 1-hour reminders;
@@ -27,15 +27,19 @@ See [C4 containers](c4/02-containers.md).
 
 | Container | Responsibility |
 |---|---|
-| ASP.NET Core API | JWT auth, webhook validation, OpenMRS/FHIR calls, reminder workers, MassTransit consumers, provider adapters. |
-| PostgreSQL | Users, organization config, provider config, appointment state, scheduled reminders, retry ledger fields, message logs, webhook logs. |
-| RabbitMQ / MassTransit | Required non-test command transport for reminder delivery. |
+| OpenMRS Gateway | Routes `/openmrs` browser and API traffic to the OpenMRS O3 frontend and backend. |
+| OpenMRS O3 Frontend | Clinical EMR user interface used by clinicians. |
+| OpenMRS Backend | OpenMRS REST/FHIR APIs plus the custom appointment webhook OMOD. |
+| OpenMRS Database | MariaDB store for OpenMRS clinical and configuration data. |
+| Communication Backend API and Workers | JWT auth, webhook validation, OpenMRS/FHIR calls, reminder workers, MassTransit consumers, provider adapters, retention, and metrics. |
+| Communication Database | PostgreSQL store for identity, organization/provider config, appointment state, scheduled reminders, retry ledger fields, templates, message logs, and webhook logs. |
+| Reminder Message Broker | RabbitMQ/MassTransit command transport for reminder delivery outside integration tests. |
 
 Local development uses RabbitMQ as well. Only the `IntegrationTest` environment may use MassTransit in-memory transport.
 
 ## 4. Configuration And Multi-OpenMRS
 
-See [multi-OpenMRS configuration](c4/11-multi-openmrs-config.md).
+See [multi-hospital system landscape](c4/07-multi-hospital-landscape.md).
 
 The preferred configuration model is JSON under `HospitalConfiguration:Organizations`. Each organization has its own OpenMRS base URL, OpenMRS credentials, webhook secret, default provider, timezone, poller settings, retry policy, and provider credentials. The startup seeder writes encrypted organization/provider settings to PostgreSQL.
 
@@ -53,13 +57,13 @@ Public registration is not the default operating model. The backend bootstraps a
 
 ## 6. Webhook Security
 
-See [webhook auth flow](c4/12-webhook-auth-flow.md) and [webhook contract](webhook-openmrs-backend.md).
+See [signed appointment webhook dynamic view](c4/05-appointment-webhook-dynamic.md) and [webhook contract](webhook-openmrs-backend.md).
 
 The backend validates required headers, organization status, timestamp skew, and HMAC before appointment processing. Duplicate event ids are accepted idempotently without duplicating appointment/reminder work.
 
 ## 7. Durable Delivery And Retry
 
-See [durable delivery and retry](c4/10-durable-delivery-retry.md).
+See [due reminder delivery and retry dynamic view](c4/06-reminder-delivery-dynamic.md).
 
 The webhook stores intent only. It does not call providers. The worker/consumer chain is:
 
@@ -73,7 +77,8 @@ Provider fallback is intentionally not automatic. A reminder uses the provider s
 
 ## 8. Data Model
 
-See [ER model](c4/08-er-diagram.md).
+The data model is owned by EF Core in `Infrastructure/Persistence/ApplicationDbContext.cs`.
+An ER diagram is not part of the C4 model.
 
 Important tables:
 
@@ -90,7 +95,7 @@ Sensitive OpenMRS and provider credentials are encrypted before storage. Appoint
 
 ## 9. Deployment
 
-See [deployment](c4/09-deployment.md).
+See [local deployment](c4/08-local-deployment.md) and [production/staging deployment](c4/09-production-deployment.md).
 
 Production target:
 
