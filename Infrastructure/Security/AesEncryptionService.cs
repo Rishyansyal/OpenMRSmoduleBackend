@@ -22,9 +22,9 @@ public class AesEncryptionService : IEncryptionService
         var nonce = new byte[AesGcm.NonceByteSizes.MaxSize];  // 12 bytes
         RandomNumberGenerator.Fill(nonce);
 
-        var data       = Encoding.UTF8.GetBytes(plaintext);
+        var data = Encoding.UTF8.GetBytes(plaintext);
         var ciphertext = new byte[data.Length];
-        var tag        = new byte[AesGcm.TagByteSizes.MaxSize]; // 16 bytes
+        var tag = new byte[AesGcm.TagByteSizes.MaxSize]; // 16 bytes
 
         using var aes = new AesGcm(_key, AesGcm.TagByteSizes.MaxSize);
         aes.Encrypt(nonce, data, ciphertext, tag);
@@ -40,9 +40,9 @@ public class AesEncryptionService : IEncryptionService
 
     public string Decrypt(string ciphertext)
     {
-        var data      = Convert.FromBase64String(ciphertext);
-        var nonce     = data[..12];
-        var tag       = data[^16..];
+        var data = Convert.FromBase64String(ciphertext);
+        var nonce = data[..12];
+        var tag = data[^16..];
         var encrypted = data[12..^16];
         var plaintext = new byte[encrypted.Length];
 

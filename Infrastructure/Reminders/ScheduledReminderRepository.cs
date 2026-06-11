@@ -99,29 +99,6 @@ public class ScheduledReminderRepository(
         await db.SaveChangesAsync(ct);
     }
 
-    public async Task MarkSentAsync(Guid scheduledReminderId, CancellationToken ct = default)
-    {
-        var reminder = await db.ScheduledReminders.SingleOrDefaultAsync(r => r.Id == scheduledReminderId, ct);
-        if (reminder is null) return;
-
-        reminder.Status = ScheduledReminderStatus.Sent;
-        reminder.SentAtUtc = DateTime.UtcNow;
-        reminder.LastErrorCode = null;
-        reminder.UpdatedAtUtc = DateTime.UtcNow;
-        await db.SaveChangesAsync(ct);
-    }
-
-    public async Task MarkFailedAsync(Guid scheduledReminderId, string errorCode, CancellationToken ct = default)
-    {
-        var reminder = await db.ScheduledReminders.SingleOrDefaultAsync(r => r.Id == scheduledReminderId, ct);
-        if (reminder is null) return;
-
-        reminder.Status = ScheduledReminderStatus.Failed;
-        reminder.LastErrorCode = errorCode;
-        reminder.UpdatedAtUtc = DateTime.UtcNow;
-        await db.SaveChangesAsync(ct);
-    }
-
     public async Task MarkSendingAsync(Guid scheduledReminderId, CancellationToken ct = default)
     {
         var reminder = await db.ScheduledReminders.SingleOrDefaultAsync(r => r.Id == scheduledReminderId, ct);

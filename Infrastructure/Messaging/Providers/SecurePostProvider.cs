@@ -30,8 +30,8 @@ public class SecurePostProvider : IMessageProvider
         IOptions<MessagingOptions> messagingOptions)
     {
         _httpClientFactory = httpClientFactory;
-        _options           = options.Value;
-        _studentGroup      = messagingOptions.Value.StudentGroup;
+        _options = options.Value;
+        _studentGroup = messagingOptions.Value.StudentGroup;
     }
 
     private async Task<string?> GetTokenAsync(
@@ -71,7 +71,7 @@ public class SecurePostProvider : IMessageProvider
             request.Headers.Add("X-STUDENT-GROUP", _studentGroup);
             request.Content = JsonContent.Create(new
             {
-                clientId     = _options.ClientId,
+                clientId = _options.ClientId,
                 clientSecret = _options.ClientSecret
             });
 
@@ -101,7 +101,7 @@ public class SecurePostProvider : IMessageProvider
         await _tokenLock.WaitAsync(ct);
         try
         {
-            _cachedToken    = null;
+            _cachedToken = null;
             _tokenExpiresAt = DateTime.MinValue;
         }
         finally
@@ -154,10 +154,10 @@ public class SecurePostProvider : IMessageProvider
             httpRequest.Headers.Add("X-STUDENT-GROUP", studentGroup);
             httpRequest.Content = JsonContent.Create(new
             {
-                format    = request.Type,
+                format = request.Type,
                 recipient,
-                body      = request.Content,
-                subject   = request.Subject
+                body = request.Content,
+                subject = request.Subject
             });
 
             var response = await client.SendAsync(httpRequest, ct);

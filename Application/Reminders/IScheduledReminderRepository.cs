@@ -7,10 +7,6 @@ public interface IScheduledReminderRepository
         int maxCount,
         CancellationToken ct = default);
 
-    Task MarkSentAsync(Guid scheduledReminderId, CancellationToken ct = default);
-
-    Task MarkFailedAsync(Guid scheduledReminderId, string errorCode, CancellationToken ct = default);
-
     Task RecordQueuePublishAsync(
         Guid scheduledReminderId,
         Guid queueMessageId,
