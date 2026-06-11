@@ -131,6 +131,9 @@ public class OpenMrsWebhookService(
         AddReminderIfFuture(appointment, "1h", appointment.StartUtc.AddHours(-1), config, nowUtc);
     }
 
+    // Reminders die net gemist zijn (binnen de grace period) worden alsnog direct ingepland.
+    private static readonly TimeSpan ReminderGracePeriod = TimeSpan.FromMinutes(5);
+
     private static void AddReminderIfFuture(
         AppointmentNotification appointment,
         string window,
@@ -138,20 +141,23 @@ public class OpenMrsWebhookService(
         OrganizationRuntimeConfig config,
         DateTime nowUtc)
     {
-        if (scheduledForUtc <= nowUtc)
+        if (scheduledForUtc < nowUtc - ReminderGracePeriod)
             return;
+
+        // Als het window net verstreken is, stuur direct
+        var effectiveTime = scheduledForUtc < nowUtc ? nowUtc : scheduledForUtc;
 
         var existing = appointment.ScheduledReminders
             .FirstOrDefault(r => r.ReminderWindow == window && r.Status == ScheduledReminderStatus.Pending);
 
         if (existing is not null)
         {
-            existing.ScheduledForUtc = scheduledForUtc;
+            existing.ScheduledForUtc = effectiveTime;
             existing.Provider = config.DefaultProvider;
             existing.MaxAttempts = config.MaxDeliveryAttempts;
             existing.RetryBaseDelaySeconds = config.RetryBaseDelaySeconds;
             existing.RetryMaxDelayMinutes = config.RetryMaxDelayMinutes;
-            existing.NextAttemptAtUtc = scheduledForUtc;
+            existing.NextAttemptAtUtc = effectiveTime;
             existing.UpdatedAtUtc = nowUtc;
             return;
         }
@@ -162,13 +168,13 @@ public class OpenMrsWebhookService(
             OrganizationId = appointment.OrganizationId,
             EncounterId = appointment.EncounterId,
             ReminderWindow = window,
-            ScheduledForUtc = scheduledForUtc,
+            ScheduledForUtc = effectiveTime,
             Provider = config.DefaultProvider,
             Status = ScheduledReminderStatus.Pending,
             MaxAttempts = config.MaxDeliveryAttempts,
             RetryBaseDelaySeconds = config.RetryBaseDelaySeconds,
             RetryMaxDelayMinutes = config.RetryMaxDelayMinutes,
-            NextAttemptAtUtc = scheduledForUtc,
+            NextAttemptAtUtc = effectiveTime,
             UpdatedAtUtc = nowUtc
         });
     }
