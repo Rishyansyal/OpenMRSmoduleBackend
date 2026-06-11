@@ -71,23 +71,6 @@ public class OpenMrsService(
         return ParseAppointmentBundle(doc.RootElement).ToList();
     }
 
-    public async Task<IEnumerable<UpcomingAppointment>> GetEncountersInRangeAsync(
-        string organizationId,
-        DateTime from,
-        DateTime to,
-        CancellationToken ct = default)
-    {
-        var (client, config) = await CreateClientAsync(organizationId, ct);
-        var f = from.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ");
-        var t = to.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ");
-        var url = $"{FhirBase(config)}/Encounter?date=ge{f}&date=le{t}&_count=100";
-        var response = await client.GetAsync(url, ct);
-        response.EnsureSuccessStatusCode();
-
-        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
-        return ParseAppointmentBundle(doc.RootElement).ToList();
-    }
-
     // Haalt afspraken uit de Bahmni Appointment Scheduling-module (de O3 "Appointments"-app).
     // Dit is een ander resourcetype dan FHIR Encounters: afspraken worden vooruit gepland en
     // vormen de basis voor afspraakherinneringen.

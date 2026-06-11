@@ -7,7 +7,6 @@ public sealed class MessagingMetrics : IDisposable
     public const string MeterName = "OpenMRS.Messaging";
 
     private readonly Meter _meter;
-    private readonly Counter<long> _messagesSent;
     private readonly Counter<long> _remindersSent;
     private readonly Counter<long> _dataRetentionDeleted;
     private readonly Histogram<double> _messageDuration;
@@ -15,10 +14,6 @@ public sealed class MessagingMetrics : IDisposable
     public MessagingMetrics()
     {
         _meter = new Meter(MeterName, "1.0");
-
-        _messagesSent = _meter.CreateCounter<long>(
-            "messaging.messages_sent",
-            description: "Aantal verstuurde berichten per provider en type");
 
         _remindersSent = _meter.CreateCounter<long>(
             "messaging.reminders_sent",
@@ -33,12 +28,6 @@ public sealed class MessagingMetrics : IDisposable
             unit: "ms",
             description: "Verzendtijd per provider");
     }
-
-    public void RecordMessageSent(string provider, string type, bool success) =>
-        _messagesSent.Add(1,
-            new KeyValuePair<string, object?>("provider", provider),
-            new KeyValuePair<string, object?>("type", type),
-            new KeyValuePair<string, object?>("success", success));
 
     public void RecordReminderSent(string window, bool success) =>
         _remindersSent.Add(1,

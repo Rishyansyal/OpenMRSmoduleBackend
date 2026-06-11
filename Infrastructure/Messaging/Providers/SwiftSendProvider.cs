@@ -31,9 +31,9 @@ public class SwiftSendProvider(
             httpRequest.Headers.Add("X-STUDENT-GROUP", studentGroup);
             httpRequest.Content = JsonContent.Create(new
             {
-                type       = request.Type,
+                type = request.Type,
                 recipients = request.Recipients,
-                content    = request.Content
+                content = request.Content
             });
 
             var response = await client.SendAsync(httpRequest, ct);
