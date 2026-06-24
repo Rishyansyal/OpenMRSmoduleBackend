@@ -48,13 +48,6 @@ public class RemindersController(
         return Ok(scheduled.Where(r => r.Status == ScheduledReminderStatus.DeadLettered));
     }
 
-    [HttpPost("{id:guid}/retry")]
-    public async Task<IActionResult> Retry(Guid id, CancellationToken ct)
-    {
-        await scheduledReminderRepository.RetryNowAsync(id, ct);
-        return Ok(new { message = "Reminder queued for retry." });
-    }
-
     [HttpGet("templates")]
     public async Task<IActionResult> GetTemplates(CancellationToken ct)
     {
@@ -62,27 +55,4 @@ public class RemindersController(
         return Ok(templates);
     }
 
-    [HttpPut("templates/{window}")]
-    public async Task<IActionResult> UpdateTemplate(
-        string window,
-        [FromBody] UpdateTemplateRequest request,
-        CancellationToken ct)
-    {
-        if (window != "24h" && window != "1h")
-            return BadRequest(new { error = "Ongeldig venster. Gebruik '24h' of '1h'." });
-
-        if (string.IsNullOrWhiteSpace(request.Body))
-            return BadRequest(new { error = "Berichttekst mag niet leeg zijn." });
-
-        await messageTemplateRepository.UpsertAsync(new MessageTemplate
-        {
-            Window = window,
-            Body = request.Body.Trim(),
-            UpdatedAtUtc = DateTime.UtcNow
-        }, ct);
-
-        return Ok(new { message = $"Sjabloon voor {window} bijgewerkt." });
-    }
 }
-
-public record UpdateTemplateRequest(string Body);

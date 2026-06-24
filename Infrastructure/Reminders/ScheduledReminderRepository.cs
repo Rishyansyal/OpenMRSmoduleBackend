@@ -163,17 +163,6 @@ public class ScheduledReminderRepository(
         await db.SaveChangesAsync(ct);
     }
 
-    public async Task RetryNowAsync(Guid scheduledReminderId, CancellationToken ct = default)
-    {
-        var reminder = await db.ScheduledReminders.SingleOrDefaultAsync(r => r.Id == scheduledReminderId, ct);
-        if (reminder is null) return;
-
-        reminder.Status = ScheduledReminderStatus.Pending;
-        reminder.NextAttemptAtUtc = DateTime.UtcNow;
-        reminder.UpdatedAtUtc = DateTime.UtcNow;
-        await db.SaveChangesAsync(ct);
-    }
-
     public async Task<IReadOnlyList<ScheduledReminderOverview>> GetRecentAsync(
         int count = 50,
         CancellationToken ct = default)
