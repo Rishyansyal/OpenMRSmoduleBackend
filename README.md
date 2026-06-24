@@ -89,13 +89,28 @@ At startup, the seeder stores organization rows in PostgreSQL:
 When the JSON section is empty, the backend can seed a single legacy organization from the older `OpenMrs:*`, `Webhooks:OpenMrs:*`, and `Messaging:*` settings.
 
 For a multi-hospital Docker deployment, create `hospital-config.json` from
-`hospital-config.example.json` and mount it with the supplied overlay:
+`hospital-config.example.json`, then mount it into the API container and set
+`HOSPITAL_CONFIG_FILE_PATH` in `.env`:
 
 ```bash
-docker compose \
-  -f docker-compose.yml \
-  -f docker-compose.hospital-config.example.yml \
-  up -d --build
+# .env
+HOSPITAL_CONFIG_FILE_PATH=/app/hospital-config.json
+```
+
+Add a volume mount via a local compose override (do not commit this file):
+
+```yaml
+# docker-compose.override.yml (add to the api service)
+services:
+  api:
+    volumes:
+      - ./hospital-config.json:/app/hospital-config.json:ro
+```
+
+Then start as usual:
+
+```bash
+docker compose up -d --build
 ```
 
 ## Run
@@ -127,7 +142,7 @@ Local runtime verification:
 ..\2.4-LU1-openMRS-Avans\tests\smoke\openmrs-spa-smoke.ps1
 ```
 
-Then confirm RabbitMQ is healthy at `http://localhost:15672`, trigger a signed synthetic webhook from Swagger or the demo endpoint, inspect `/api/reminders/scheduled`, and trigger `/api/reminders/trigger`. Scheduled reminder output is operational metadata only: it includes status, provider, timestamps, queue message id, provider message id, and a hashed encounter reference, not patient names, contact details, message content, or plaintext encounter ids.
+Then confirm RabbitMQ is healthy at `http://localhost:15672`, trigger a signed synthetic webhook from Swagger, inspect `/api/reminders/scheduled`, and trigger `/api/reminders/trigger`. Scheduled reminder output is operational metadata only: it includes status, provider, timestamps, queue message id, provider message id, and a hashed encounter reference, not patient names, contact details, message content, or plaintext encounter ids.
 
 ## Auth Flow
 
