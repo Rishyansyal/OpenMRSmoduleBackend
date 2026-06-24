@@ -480,3 +480,6 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# Multi-organisatie config met secrets — nooit committen
+hospital-config.json
