@@ -21,14 +21,14 @@ Read `docs/adr/` before changing architecture. New persisted entities require an
 - Secrets belong in `.env`, environment variables, or a mounted hospital JSON config.
 - Use `hospital-config.example.json` as the multi-OpenMRS template.
 - Each organization has its own OpenMRS credentials, webhook secret, provider config, and retry policy.
-- RabbitMQ is required outside local `Development` and `IntegrationTest`.
+- RabbitMQ is required outside `IntegrationTest`.
 
 ## Auth
 
 - ASP.NET Core Identity stores users and roles.
 - Startup bootstraps an `Admin` user from configuration.
 - Public `/auth/register` is disabled unless intentionally enabled.
-- Admin-only endpoints include reminder trigger/templates/dead-letter retry, data retention trigger, and demo webhook signing.
+- Admin-only endpoints include reminder trigger/templates, data retention trigger.
 
 ## Reliability
 

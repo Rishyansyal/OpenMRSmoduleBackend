@@ -78,6 +78,9 @@ erDiagram
         int retry_max_delay_minutes
         timestamp last_attempt_at_utc
         timestamp next_attempt_at_utc
+        text queue_message_id
+        timestamp queued_at_utc
+        timestamp consumed_at_utc
         text provider_message_id
         timestamp sent_at_utc
         timestamp created_at_utc
@@ -107,6 +110,12 @@ erDiagram
         text error_code
         timestamp sent_at
         text sent_by_user_id
+    }
+
+    MESSAGE_TEMPLATES {
+        text window PK
+        text body
+        timestamp updated_at_utc
     }
 
     WEBHOOK_EVENT_LOGS {
