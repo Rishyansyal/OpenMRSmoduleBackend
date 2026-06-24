@@ -18,8 +18,9 @@ Use the multi-stage `Dockerfile` and `docker-compose.yml` with:
 - `rabbitmq`.
 
 Configuration is supplied through environment variables and a local `.env`.
-Multi-hospital deployments can additionally mount JSON configuration using
-`docker-compose.hospital-config.example.yml`.
+Multi-hospital deployments mount JSON configuration by adding a volume for
+`hospital-config.json` in a local compose override and setting
+`HOSPITAL_CONFIG_FILE_PATH` in `.env`.
 
 ## Consequences
 

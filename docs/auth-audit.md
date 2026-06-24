@@ -22,11 +22,8 @@ The `Admin` role is required for operational actions:
 | `GET /api/reminders/history` | `Admin` policy |
 | `GET /api/reminders/scheduled` | `Admin` policy |
 | `GET /api/reminders/dead-lettered` | `Admin` policy |
-| `POST /api/reminders/{id}/retry` | `Admin` policy |
 | `GET /api/reminders/templates` | `Admin` policy |
-| `PUT /api/reminders/templates/{window}` | `Admin` policy |
 | `POST /api/data-retention/trigger` | `Admin` policy |
-| `POST /api/demo/openmrs/appointment` | `Admin` policy |
 
 Direct message history and AsyncFlow tracking remain scoped to the authenticated
 sender. OpenMRS proxy calls require a configured organization and reject unknown
