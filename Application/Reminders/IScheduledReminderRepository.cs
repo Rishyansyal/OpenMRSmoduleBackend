@@ -29,8 +29,6 @@ public interface IScheduledReminderRepository
         string? errorCode,
         CancellationToken ct = default);
 
-    Task RetryNowAsync(Guid scheduledReminderId, CancellationToken ct = default);
-
     Task<IReadOnlyList<ScheduledReminderOverview>> GetRecentAsync(
         int count = 50,
         CancellationToken ct = default);
