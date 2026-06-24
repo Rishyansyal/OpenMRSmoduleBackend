@@ -1,0 +1,6 @@
+# Demo-override: laat de ReminderWorker elke minuut dispatchen i.p.v. elke 5 min,
+# zodat due reminders binnen ~1 min automatisch door de queue gaan.
+services:
+  api:
+    environment:
+      Reminders__IntervalMinutes: "1"

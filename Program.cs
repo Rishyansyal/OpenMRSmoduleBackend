@@ -215,7 +215,12 @@ builder.Services.AddHttpClient();
 builder.Services.AddHttpClient("openmrs", client =>
 {
     client.Timeout = TimeSpan.FromSeconds(30);
-});
+})
+// Cookies uit: de client authenticeert per request met Basic-auth. Meerdere OpenMRS-
+// instanties draaien op dezelfde host (host.docker.internal, andere poort), en cookies
+// negeren de poort. Met een gedeelde cookie-jar zou de JSESSIONID van organisatie A
+// meelekken naar organisatie B en daar een 401 veroorzaken.
+.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { UseCookies = false });
 builder.Services.Configure<HospitalConfigurationOptions>(builder.Configuration.GetSection("HospitalConfiguration"));
 builder.Services.AddScoped<IOrganizationConfigRepository, OrganizationConfigRepository>();
 builder.Services.AddScoped<OrganizationConfigSeeder>();

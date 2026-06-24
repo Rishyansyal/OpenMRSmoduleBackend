@@ -16,6 +16,16 @@ Coverage includes:
 - PostgreSQL-style reminder retry ledger behavior: retry waits and dead letters.
 - Health endpoints and generated Swagger bearer configuration.
 
+### Multi-OpenMRS (multi-tenant) isolation
+
+The backend serves multiple OpenMRS instances at once, each as its own organization. Tests guard the tenant boundary:
+
+- **Per-organization webhook signatures** (`OpenMrsWebhookSignatureValidatorTests`):
+  - each organization validates against its *own* webhook secret;
+  - a payload signed with organization A's secret but claiming organization B is rejected (`INVALID_SIGNATURE`) — organization A cannot forge webhooks for B;
+  - an unknown organization is rejected (`UNKNOWN_ORGANIZATION`).
+- **HTTP session-cookie isolation** (`OpenMrsHttpClientCookieTests`): the shared `openmrs` `HttpClient` does not persist or resend session cookies between requests. Because multiple OpenMRS instances share a host (e.g. `host.docker.internal`, different port) and cookies ignore the port, a shared cookie jar would leak organization A's `JSESSIONID` to organization B and cause a `401`. The client is configured with `UseCookies = false` (Program.cs) and relies solely on per-request Basic auth. A control client with cookies enabled is asserted to *do* resend the cookie, so the test cannot pass falsely.
+
 ## OpenMRS Webhook Module
 
 ```bash
