@@ -1,4 +1,5 @@
 using Application.Reminders;
+using Application.Auth;
 using Domain;
 using Infrastructure.Reminders;
 using Microsoft.AspNetCore.Authorization;
@@ -8,7 +9,7 @@ namespace Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
+[Authorize(Policy = AuthPolicies.AdminOnly)]
 public class RemindersController(
     ReminderWorker reminderWorker,
     IReminderLogRepository reminderLogRepository,
@@ -38,6 +39,20 @@ public class RemindersController(
     {
         var scheduled = await scheduledReminderRepository.GetRecentAsync(count, ct);
         return Ok(scheduled);
+    }
+
+    [HttpGet("dead-lettered")]
+    public async Task<IActionResult> GetDeadLettered([FromQuery] int count = 50, CancellationToken ct = default)
+    {
+        var scheduled = await scheduledReminderRepository.GetRecentAsync(count, ct);
+        return Ok(scheduled.Where(r => r.Status == ScheduledReminderStatus.DeadLettered));
+    }
+
+    [HttpPost("{id:guid}/retry")]
+    public async Task<IActionResult> Retry(Guid id, CancellationToken ct)
+    {
+        await scheduledReminderRepository.RetryNowAsync(id, ct);
+        return Ok(new { message = "Reminder queued for retry." });
     }
 
     [HttpGet("templates")]

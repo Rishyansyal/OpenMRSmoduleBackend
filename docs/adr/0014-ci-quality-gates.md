@@ -1,36 +1,22 @@
 # 14. CI quality gates
 
 Date: 2026-05-23
-
-## Status
-
-Accepted
+Status: Accepted, amended 2026-05-30
 
 ## Context
 
-Het project had geen consistente GitHub Actions checks voor backend, frontend en OpenMRS-module.
+Shared repositories need repeatable checks for build regressions and leaked
+secrets.
 
 ## Decision
 
-Iedere repository krijgt een eigen workflow:
-
-- Backend CI: restore, build, xUnit tests, Docker build en secret scan.
-- Frontend CI: `npm ci`, lint, Vitest, Next build, Playwright smoke en secret scan.
-- OpenMRS CI: Java 21/Maven tests voor de webhook-module, distro package check en secret scan.
-
-## Overwogen alternatieven
-
-| Alternatief | Reden van afval |
-|---|---|
-| **Geen CI, alleen handmatige reviews** | Build- en testfouten worden pas in main zichtbaar; secretleaks blijven onopgemerkt. Niet acceptabel voor een gedeelde repo. |
-| **Azure DevOps Pipelines** | Werkt, maar vereist Azure-account en een aparte tool naast GitHub waar de code al leeft. Onnodige split-brain. |
-| **Self-hosted Jenkins** | Eigen runners onderhouden, plugin-soep, beveiligingsupdates: te veel operationele last voor projectschaal. |
-| **GitLab CI** | Vereist migratie naar GitLab; geen voordeel boven GitHub Actions voor onze workflow. |
-| **Pre-commit hooks only (geen serverside CI)** | Lokaal te omzeilen; geeft geen garanties op een gedeelde branch. |
-| **Heavy E2E op elke PR (full Docker stack)** | Te traag (minuten) en flaky; bewust uitgesloten ([ADR-0013](0013-pragmatic-automated-test-strategy.md)). |
+- Backend CI restores, release-builds, runs xUnit tests with coverage, builds
+  the Docker image, and runs Gitleaks.
+- OpenMRS workflows build the distro and validate the webhook OMOD.
+- Heavy full-stack acceptance remains a release or operator check.
 
 ## Consequences
 
-- Pull requests falen vroeg op build-, test- of secretproblemen.
-- CI gebruikt .NET 10 expliciet; lokale host-builds vereisen ook de .NET 10 SDK.
-- De zwaardere OpenMRS runtime test is bewust niet verplicht op iedere PR.
+- Pull requests fail early on common regressions.
+- Docker runtime acceptance remains explicit because it requires a working
+  engine and takes longer than unit-level checks.

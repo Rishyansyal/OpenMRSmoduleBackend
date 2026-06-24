@@ -1,22 +1,19 @@
 using System.Security.Cryptography;
 using System.Text;
+using Application.Organizations;
 using Application.Security;
 using Application.Webhooks;
 using Domain;
 using Infrastructure.Persistence;
-using Infrastructure.Reminders;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 
 namespace Infrastructure.Webhooks;
 
 public class OpenMrsWebhookService(
     ApplicationDbContext db,
     IFieldEncryptionService encryption,
-    IOptions<ReminderOptions> reminderOptions) : IOpenMrsWebhookService
+    IOrganizationConfigRepository organizationConfigs) : IOpenMrsWebhookService
 {
-    private readonly ReminderOptions _reminderOptions = reminderOptions.Value;
-
     public async Task<WebhookProcessingResult> ProcessAppointmentAsync(
         string eventId,
         string eventType,
@@ -48,6 +45,10 @@ public class OpenMrsWebhookService(
                 Duplicate: true,
                 Message: "Event was already processed.");
         }
+
+        var config = await organizationConfigs.GetByIdAsync(organizationId, ct);
+        if (config is null)
+            throw new InvalidOperationException("OpenMRS organization is not configured or is disabled.");
 
         await using var tx = await db.Database.BeginTransactionAsync(ct);
 
@@ -98,20 +99,7 @@ public class OpenMrsWebhookService(
         appointment.LastEventId = eventId;
         appointment.UpdatedAtUtc = now;
 
-        var config = await db.OrganizationIntegrationConfigs
-            .SingleOrDefaultAsync(c => c.OrganizationId == organizationId, ct);
-
-        if (config is null)
-        {
-            config = new OrganizationIntegrationConfig
-            {
-                OrganizationId = organizationId,
-                DefaultProvider = _reminderOptions.DefaultProvider
-            };
-            db.OrganizationIntegrationConfigs.Add(config);
-        }
-
-        RecomputeReminderSchedule(appointment, config.DefaultProvider, now);
+        RecomputeReminderSchedule(appointment, config, now);
 
         log.Processed = true;
         await db.SaveChangesAsync(ct);
@@ -126,7 +114,7 @@ public class OpenMrsWebhookService(
 
     private static void RecomputeReminderSchedule(
         AppointmentNotification appointment,
-        string provider,
+        OrganizationRuntimeConfig config,
         DateTime nowUtc)
     {
         foreach (var pending in appointment.ScheduledReminders
@@ -139,27 +127,37 @@ public class OpenMrsWebhookService(
         if (appointment.IsCancelled || appointment.StartUtc <= nowUtc)
             return;
 
-        AddReminderIfFuture(appointment, "24h", appointment.StartUtc.AddHours(-24), provider, nowUtc);
-        AddReminderIfFuture(appointment, "1h", appointment.StartUtc.AddHours(-1), provider, nowUtc);
+        AddReminderIfFuture(appointment, "24h", appointment.StartUtc.AddHours(-24), config, nowUtc);
+        AddReminderIfFuture(appointment, "1h", appointment.StartUtc.AddHours(-1), config, nowUtc);
     }
+
+    // Reminders die net gemist zijn (binnen de grace period) worden alsnog direct ingepland.
+    private static readonly TimeSpan ReminderGracePeriod = TimeSpan.FromMinutes(5);
 
     private static void AddReminderIfFuture(
         AppointmentNotification appointment,
         string window,
         DateTime scheduledForUtc,
-        string provider,
+        OrganizationRuntimeConfig config,
         DateTime nowUtc)
     {
-        if (scheduledForUtc <= nowUtc)
+        if (scheduledForUtc < nowUtc - ReminderGracePeriod)
             return;
+
+        // Als het window net verstreken is, stuur direct
+        var effectiveTime = scheduledForUtc < nowUtc ? nowUtc : scheduledForUtc;
 
         var existing = appointment.ScheduledReminders
             .FirstOrDefault(r => r.ReminderWindow == window && r.Status == ScheduledReminderStatus.Pending);
 
         if (existing is not null)
         {
-            existing.ScheduledForUtc = scheduledForUtc;
-            existing.Provider = provider;
+            existing.ScheduledForUtc = effectiveTime;
+            existing.Provider = config.DefaultProvider;
+            existing.MaxAttempts = config.MaxDeliveryAttempts;
+            existing.RetryBaseDelaySeconds = config.RetryBaseDelaySeconds;
+            existing.RetryMaxDelayMinutes = config.RetryMaxDelayMinutes;
+            existing.NextAttemptAtUtc = effectiveTime;
             existing.UpdatedAtUtc = nowUtc;
             return;
         }
@@ -170,9 +168,13 @@ public class OpenMrsWebhookService(
             OrganizationId = appointment.OrganizationId,
             EncounterId = appointment.EncounterId,
             ReminderWindow = window,
-            ScheduledForUtc = scheduledForUtc,
-            Provider = provider,
+            ScheduledForUtc = effectiveTime,
+            Provider = config.DefaultProvider,
             Status = ScheduledReminderStatus.Pending,
+            MaxAttempts = config.MaxDeliveryAttempts,
+            RetryBaseDelaySeconds = config.RetryBaseDelaySeconds,
+            RetryMaxDelayMinutes = config.RetryMaxDelayMinutes,
+            NextAttemptAtUtc = effectiveTime,
             UpdatedAtUtc = nowUtc
         });
     }

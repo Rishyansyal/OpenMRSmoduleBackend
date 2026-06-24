@@ -15,19 +15,25 @@ public class SwiftSendProvider(
 
     public string ProviderName => "swiftsend";
 
-    public async Task<SendMessageResult> SendAsync(SendMessageRequest request, CancellationToken ct = default)
+    public async Task<SendMessageResult> SendAsync(
+        SendMessageRequest request,
+        MessageProviderConfiguration? configuration = null,
+        CancellationToken ct = default)
     {
         try
         {
+            var baseUrl = configuration?.BaseUrl ?? _options.BaseUrl;
+            var apiKey = configuration?.GetCredential("apiKey") ?? _options.ApiKey;
+            var studentGroup = configuration?.StudentGroup ?? _studentGroup;
             var client = httpClientFactory.CreateClient();
-            using var httpRequest = new HttpRequestMessage(HttpMethod.Post, $"{_options.BaseUrl}/swiftsend");
-            httpRequest.Headers.Add("X-API-KEY", _options.ApiKey);
-            httpRequest.Headers.Add("X-STUDENT-GROUP", _studentGroup);
+            using var httpRequest = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/swiftsend");
+            httpRequest.Headers.Add("X-API-KEY", apiKey);
+            httpRequest.Headers.Add("X-STUDENT-GROUP", studentGroup);
             httpRequest.Content = JsonContent.Create(new
             {
-                type       = request.Type,
+                type = request.Type,
                 recipients = request.Recipients,
-                content    = request.Content
+                content = request.Content
             });
 
             var response = await client.SendAsync(httpRequest, ct);

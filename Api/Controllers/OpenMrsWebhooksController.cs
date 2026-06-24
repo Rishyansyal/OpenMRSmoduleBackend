@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+using System.Text;
 using System.Text.Json;
 using Application.Webhooks;
 using Microsoft.AspNetCore.Authorization;
@@ -12,6 +14,7 @@ public class OpenMrsWebhooksController(
     IOpenMrsWebhookSignatureValidator signatureValidator,
     IOpenMrsWebhookService webhookService) : ControllerBase
 {
+    private const int MaxWebhookBodyBytes = 256 * 1024;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         PropertyNameCaseInsensitive = true
@@ -21,11 +24,23 @@ public class OpenMrsWebhooksController(
     [Consumes("application/json")]
     public async Task<IActionResult> ReceiveAppointment(CancellationToken ct)
     {
+        if (Request.ContentLength > MaxWebhookBodyBytes)
+            return BadRequest(new { error = "BODY_TOO_LARGE", message = "Webhook body is too large." });
+
         var body = await ReadBodyAsync(ct);
-        var validation = signatureValidator.Validate(
+        if (body is null)
+            return BadRequest(new { error = "BODY_TOO_LARGE", message = "Webhook body is too large." });
+
+        var eventId = Request.Headers["X-OpenMRS-Event-Id"].FirstOrDefault();
+        var eventType = Request.Headers["X-OpenMRS-Event-Type"].FirstOrDefault();
+        var organizationId = Request.Headers["X-OpenMRS-Organization-Id"].FirstOrDefault();
+
+        var validation = await signatureValidator.ValidateAsync(
+            organizationId,
             Request.Headers["X-OpenMRS-Timestamp"].FirstOrDefault(),
             Request.Headers["X-OpenMRS-Signature"].FirstOrDefault(),
-            body);
+            body,
+            ct);
 
         if (!validation.IsValid)
         {
@@ -34,10 +49,6 @@ public class OpenMrsWebhooksController(
                 : StatusCodes.Status400BadRequest;
             return StatusCode(status, new { error = validation.ErrorCode, message = validation.ErrorMessage });
         }
-
-        var eventId = Request.Headers["X-OpenMRS-Event-Id"].FirstOrDefault();
-        var eventType = Request.Headers["X-OpenMRS-Event-Type"].FirstOrDefault();
-        var organizationId = Request.Headers["X-OpenMRS-Organization-Id"].FirstOrDefault();
 
         if (string.IsNullOrWhiteSpace(eventId) ||
             string.IsNullOrWhiteSpace(eventType) ||
@@ -62,6 +73,21 @@ public class OpenMrsWebhooksController(
 
         if (payload is null)
             return BadRequest(new { error = "EMPTY_BODY", message = "Webhook body is required." });
+
+        var validationResults = new List<ValidationResult>();
+        if (!Validator.TryValidateObject(
+                payload,
+                new ValidationContext(payload),
+                validationResults,
+                validateAllProperties: true))
+        {
+            return BadRequest(new
+            {
+                error = "INVALID_PAYLOAD",
+                message = "Webhook body failed validation.",
+                details = validationResults.Select(result => result.ErrorMessage)
+            });
+        }
 
         try
         {
@@ -91,12 +117,26 @@ public class OpenMrsWebhooksController(
         }
     }
 
-    private async Task<string> ReadBodyAsync(CancellationToken ct)
+    private async Task<string?> ReadBodyAsync(CancellationToken ct)
     {
         Request.EnableBuffering();
         using var reader = new StreamReader(Request.Body, leaveOpen: true);
-        var body = await reader.ReadToEndAsync(ct);
+        var builder = new StringBuilder();
+        var buffer = new char[8192];
+
+        while (true)
+        {
+            var read = await reader.ReadAsync(buffer, ct);
+            if (read == 0)
+                break;
+
+            builder.Append(buffer, 0, read);
+            if (builder.Length > MaxWebhookBodyBytes)
+                return null;
+        }
+
+        var body = builder.ToString();
         Request.Body.Position = 0;
-        return body;
+        return Encoding.UTF8.GetByteCount(body) <= MaxWebhookBodyBytes ? body : null;
     }
 }

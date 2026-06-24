@@ -1,31 +1,66 @@
 classDiagram
-    class User {
-        +Guid Id
-        +string Email
-        +string PasswordHash
-        +DateTime CreatedAt
+    class OrganizationIntegrationConfig {
+        +string OrganizationId
+        +string OpenMrsBaseUrl
+        +string WebhookSecretEncrypted
+        +string DefaultProvider
+        +bool PollerEnabled
+        +int MaxDeliveryAttempts
+        +int RetryBaseDelaySeconds
+        +int RetryMaxDelayMinutes
     }
 
-    class MessageLog {
-        +Guid Id
-        +string Provider
-        +string MessageType
-        +int RecipientCount
-        +int FailedCount
-        +string? ProviderMessageId
-        +bool Success
-        +string? ErrorCode
-        +DateTime SentAt
-        +string SentByUserId
+    class OrganizationProviderConfig {
+        +string OrganizationId
+        +string ProviderName
+        +bool Enabled
+        +string BaseUrl
+        +string CredentialsJsonEncrypted
     }
 
-    class ReminderLog {
-        +Guid Id
+    class AppointmentNotification {
+        +string OrganizationId
+        +string EncounterId
+        +DateTime StartUtc
+        +bool IsCancelled
+    }
+
+    class ScheduledReminder {
+        +string OrganizationId
         +string EncounterId
         +string ReminderWindow
         +string Provider
-        +bool Success
-        +string? ErrorCode
-        +DateTime EncounterStart
-        +DateTime SentAt
+        +string Status
+        +int AttemptCount
+        +int MaxAttempts
+        +DateTime NextAttemptAtUtc
+        +string ProviderMessageId
     }
+
+    class OrganizationConfigSeeder {
+        +SeedAsync()
+    }
+
+    class OrganizationConfigRepository {
+        +GetByIdAsync(organizationId)
+        +GetProviderAsync(organizationId, providerName)
+    }
+
+    class ReminderWorker {
+        +ProcessAsync()
+    }
+
+    class SendReminderConsumer {
+        +Consume(context)
+    }
+
+    OrganizationIntegrationConfig "1" --> "*" OrganizationProviderConfig
+    OrganizationIntegrationConfig "1" --> "*" AppointmentNotification
+    AppointmentNotification "1" --> "*" ScheduledReminder
+    OrganizationConfigSeeder --> OrganizationIntegrationConfig
+    OrganizationConfigSeeder --> OrganizationProviderConfig
+    OrganizationConfigRepository --> OrganizationIntegrationConfig
+    OrganizationConfigRepository --> OrganizationProviderConfig
+    ReminderWorker --> ScheduledReminder
+    SendReminderConsumer --> ScheduledReminder
+    SendReminderConsumer --> OrganizationConfigRepository

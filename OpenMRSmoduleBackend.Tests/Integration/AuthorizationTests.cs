@@ -27,17 +27,17 @@ public sealed class AuthorizationTests(BackendIntegrationTestFactory factory) :
     // ------------------------------------------------------------------
 
     [Theory]
-    [InlineData("GET",  "/auth/me")]
-    [InlineData("GET",  "/health/db")]
-    [InlineData("GET",  "/api/messages/providers")]
-    [InlineData("GET",  "/api/messages/history")]
-    [InlineData("GET",  "/api/messages/status/some-tracking-id")]
-    [InlineData("GET",  "/api/openmrs/patients?q=jan")]
-    [InlineData("GET",  "/api/openmrs/patients/123")]
-    [InlineData("GET",  "/api/openmrs/appointments")]
-    [InlineData("GET",  "/api/reminders/history")]
-    [InlineData("GET",  "/api/reminders/scheduled")]
-    [InlineData("GET",  "/api/reminders/templates")]
+    [InlineData("GET", "/auth/me")]
+    [InlineData("GET", "/health/db")]
+    [InlineData("GET", "/api/messages/providers")]
+    [InlineData("GET", "/api/messages/history")]
+    [InlineData("GET", "/api/messages/status/some-tracking-id")]
+    [InlineData("GET", "/api/openmrs/patients?q=jan")]
+    [InlineData("GET", "/api/openmrs/patients/123")]
+    [InlineData("GET", "/api/openmrs/appointments")]
+    [InlineData("GET", "/api/reminders/history")]
+    [InlineData("GET", "/api/reminders/scheduled")]
+    [InlineData("GET", "/api/reminders/templates")]
     [InlineData("POST", "/api/reminders/trigger")]
     [InlineData("POST", "/api/data-retention/trigger")]
     public async Task ProtectedEndpoints_RequireAuthentication(string method, string path)
@@ -189,13 +189,13 @@ public sealed class AuthorizationTests(BackendIntegrationTestFactory factory) :
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         db.MessageLogs.Add(new MessageLog
         {
-            Provider          = "swiftsend",
-            MessageType       = "sms",
-            RecipientCount    = 1,
-            FailedCount       = 0,
+            Provider = "swiftsend",
+            MessageType = "sms",
+            RecipientCount = 1,
+            FailedCount = 0,
             ProviderMessageId = providerMessageId,
-            Success           = true,
-            SentByUserId      = sentByUserId
+            Success = true,
+            SentByUserId = sentByUserId
         });
         await db.SaveChangesAsync();
     }

@@ -6,6 +6,7 @@ using System.Text.Json;
 using Domain;
 using Infrastructure.Persistence;
 using Infrastructure.Webhooks;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -32,6 +33,16 @@ public sealed class BackendIntegrationTests(
         using var json = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
         Assert.Equal("Healthy", json.RootElement.GetProperty("status").GetString());
         Assert.Equal("reachable", json.RootElement.GetProperty("db").GetString());
+    }
+
+    [Fact]
+    public async Task HealthReadiness_IsAnonymouslyAccessible()
+    {
+        using var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/health/readiness");
+
+        Assert.True(response.StatusCode is HttpStatusCode.OK or HttpStatusCode.ServiceUnavailable);
     }
 
     [Fact]
@@ -68,6 +79,7 @@ public sealed class BackendIntegrationTests(
         }
 
         await AuthenticateAsync(client, "reminder-reader@example.test");
+        await GrantAdminRoleAsync(client);
 
         var scheduledResponse = await client.GetAsync("/api/reminders/scheduled");
 
@@ -77,7 +89,8 @@ public sealed class BackendIntegrationTests(
         Assert.Equal(2, scheduledJson.RootElement.GetArrayLength());
         Assert.All(scheduledJson.RootElement.EnumerateArray(), reminder =>
         {
-            Assert.Equal("enc-100", reminder.GetProperty("encounterId").GetString());
+            Assert.False(reminder.TryGetProperty("encounterId", out _));
+            Assert.False(string.IsNullOrWhiteSpace(reminder.GetProperty("encounterReferenceHash").GetString()));
             Assert.Equal("pending", reminder.GetProperty("status").GetString());
         });
     }
@@ -140,6 +153,7 @@ public sealed class BackendIntegrationTests(
     {
         using var client = factory.CreateClient();
         await AuthenticateAsync(client, "webhook-demo@example.test");
+        await GrantAdminRoleAsync(client);
 
         var demoResponse = await client.PostAsync(
             "/api/demo/webhooks/openmrs/signed-appointment",
@@ -231,5 +245,40 @@ public sealed class BackendIntegrationTests(
 
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", token);
+    }
+
+    private async Task GrantAdminRoleAsync(HttpClient client)
+    {
+        var email = client.DefaultRequestHeaders.Authorization;
+        Assert.NotNull(email);
+
+        using var meResponse = await client.GetAsync("/auth/me");
+        meResponse.EnsureSuccessStatusCode();
+        using var meJson = await JsonDocument.ParseAsync(await meResponse.Content.ReadAsStreamAsync());
+        var userId = meJson.RootElement.GetProperty("id").GetString();
+        Assert.False(string.IsNullOrWhiteSpace(userId));
+
+        using var scope = factory.Services.CreateScope();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
+        var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+        if (!await roleManager.RoleExistsAsync(Application.Auth.AuthPolicies.AdminRole))
+            await roleManager.CreateAsync(new IdentityRole(Application.Auth.AuthPolicies.AdminRole));
+
+        var user = await userManager.FindByIdAsync(userId!);
+        Assert.NotNull(user);
+        await userManager.AddToRoleAsync(user!, Application.Auth.AuthPolicies.AdminRole);
+
+        // Refresh claims after assigning the role.
+        client.DefaultRequestHeaders.Authorization = null;
+        var loginResponse = await client.PostAsJsonAsync("/auth/login", new
+        {
+            email = user!.Email,
+            password = "Password123!"
+        });
+        loginResponse.EnsureSuccessStatusCode();
+        using var loginJson = await JsonDocument.ParseAsync(await loginResponse.Content.ReadAsStreamAsync());
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            loginJson.RootElement.GetProperty("token").GetString());
     }
 }

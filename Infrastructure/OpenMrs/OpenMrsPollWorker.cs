@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Application.OpenMrs;
+using Application.Organizations;
 using Application.Webhooks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -18,7 +19,10 @@ public class OpenMrsPollWorker(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        if (!_options.Enabled)
+        using var startupScope = serviceProvider.CreateScope();
+        var startupConfigs = startupScope.ServiceProvider.GetRequiredService<IOrganizationConfigRepository>();
+        var configuredOrganizations = await startupConfigs.GetPollingEnabledAsync(stoppingToken);
+        if (!_options.Enabled && configuredOrganizations.Count == 0)
         {
             logger.LogInformation("OpenMrsPollWorker is uitgeschakeld via configuratie.");
             return;
@@ -45,61 +49,67 @@ public class OpenMrsPollWorker(
 
     public async Task PollAsync(CancellationToken ct)
     {
-        using var scope = serviceProvider.CreateScope();
-        var openMrs = scope.ServiceProvider.GetRequiredService<IOpenMrsService>();
-        var webhookService = scope.ServiceProvider.GetRequiredService<IOpenMrsWebhookService>();
-
-        var now = DateTime.UtcNow;
-        var to = now.AddHours(_options.LookaheadHours);
-
-        var encounters = await openMrs.GetEncountersInRangeAsync(now, to, ct);
-        var seen = 0;
-        var accepted = 0;
-        var duplicates = 0;
-
-        foreach (var enc in encounters)
+        using var configScope = serviceProvider.CreateScope();
+        var organizationConfigs = configScope.ServiceProvider.GetRequiredService<IOrganizationConfigRepository>();
+        var organizations = await organizationConfigs.GetPollingEnabledAsync(ct);
+        foreach (var organization in organizations)
         {
-            if (string.IsNullOrWhiteSpace(enc.PatientId) || enc.Start == DateTime.MinValue)
-                continue;
+            using var scope = serviceProvider.CreateScope();
+            var openMrs = scope.ServiceProvider.GetRequiredService<IOpenMrsService>();
+            var webhookService = scope.ServiceProvider.GetRequiredService<IOpenMrsWebhookService>();
 
-            seen++;
+            var now = DateTime.UtcNow;
+            var to = now.AddHours(organization.PollerLookaheadHours);
 
-            var payload = new OpenMrsAppointmentWebhookRequest(
-                EncounterId: enc.Id,
-                PatientId: enc.PatientId,
-                Start: enc.Start,
-                Status: string.IsNullOrWhiteSpace(enc.Status) ? "planned" : enc.Status,
-                End: enc.End,
-                PatientDisplay: string.IsNullOrWhiteSpace(enc.PatientDisplay) ? null : enc.PatientDisplay,
-                ServiceType: enc.ServiceType,
-                Location: enc.Location,
-                Instructions: enc.Instructions);
+            var appointments = await openMrs.GetAppointmentsInRangeAsync(organization.OrganizationId, now, to, ct);
+            var seen = 0;
+            var accepted = 0;
+            var duplicates = 0;
 
-            var eventId = BuildSyntheticEventId(payload);
-
-            try
+            foreach (var appt in appointments)
             {
-                var result = await webhookService.ProcessAppointmentAsync(
-                    eventId,
-                    eventType: "POLLED",
-                    organizationId: _options.OrganizationId,
-                    eventTimestamp: DateTimeOffset.UtcNow,
-                    payload: payload,
-                    ct);
+                if (string.IsNullOrWhiteSpace(appt.PatientId) || appt.Start == DateTime.MinValue)
+                    continue;
 
-                if (result.Duplicate) duplicates++;
-                else if (result.Accepted) accepted++;
+                seen++;
+
+                var payload = new OpenMrsAppointmentWebhookRequest(
+                    EncounterId: appt.Id,
+                    PatientId: appt.PatientId,
+                    Start: appt.Start,
+                    Status: string.IsNullOrWhiteSpace(appt.Status) ? "planned" : appt.Status,
+                    End: appt.End,
+                    PatientDisplay: string.IsNullOrWhiteSpace(appt.PatientDisplay) ? null : appt.PatientDisplay,
+                    ServiceType: appt.ServiceType,
+                    Location: appt.Location,
+                    Instructions: appt.Instructions);
+
+                var eventId = BuildSyntheticEventId(payload);
+
+                try
+                {
+                    var result = await webhookService.ProcessAppointmentAsync(
+                        eventId,
+                        eventType: "POLLED",
+                        organizationId: organization.OrganizationId,
+                        eventTimestamp: DateTimeOffset.UtcNow,
+                        payload: payload,
+                        ct);
+
+                    if (result.Duplicate) duplicates++;
+                    else if (result.Accepted) accepted++;
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "Poll-event voor afspraak {appt} kon niet worden verwerkt.", appt.Id);
+                }
             }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Poll-event voor encounter {enc} kon niet worden verwerkt.", enc.Id);
-            }
+
+            if (seen > 0)
+                logger.LogInformation(
+                    "OpenMRS-poll voor {org}: {seen} afspraken gezien, {accepted} nieuw/gewijzigd, {dup} ongewijzigd.",
+                    organization.OrganizationId, seen, accepted, duplicates);
         }
-
-        if (seen > 0)
-            logger.LogInformation(
-                "OpenMRS-poll: {seen} encounters gezien, {accepted} nieuw/gewijzigd, {dup} ongewijzigd.",
-                seen, accepted, duplicates);
     }
 
     private static string BuildSyntheticEventId(OpenMrsAppointmentWebhookRequest payload)

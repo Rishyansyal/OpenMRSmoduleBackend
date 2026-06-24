@@ -1,29 +1,45 @@
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
+using Application.Organizations;
 using Application.Webhooks;
 using Microsoft.Extensions.Options;
 
 namespace Infrastructure.Webhooks;
 
-public class OpenMrsWebhookSignatureValidator(IOptions<OpenMrsWebhookOptions> options)
+public class OpenMrsWebhookSignatureValidator(
+    IOptions<OpenMrsWebhookOptions> options,
+    IOrganizationConfigRepository organizationConfigs)
     : IOpenMrsWebhookSignatureValidator
 {
     private readonly OpenMrsWebhookOptions _options = options.Value;
 
-    public WebhookSignatureValidationResult Validate(
+    public async Task<WebhookSignatureValidationResult> ValidateAsync(
+        string? organizationId,
         string? timestampHeader,
         string? signatureHeader,
-        string body)
+        string body,
+        CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(_options.Secret))
+        if (string.IsNullOrWhiteSpace(organizationId))
+            return Invalid("MISSING_ORGANIZATION", "X-OpenMRS-Organization-Id is required.");
+
+        var organization = await organizationConfigs.GetByIdAsync(organizationId, ct);
+        if (organization is null)
         {
             return new WebhookSignatureValidationResult(
                 false,
                 null,
-                "WEBHOOK_SECRET_NOT_CONFIGURED",
-                "OpenMRS webhook secret is not configured.");
+                "UNKNOWN_ORGANIZATION",
+                "OpenMRS organization is not configured or is disabled.");
         }
+
+        var secret = organization.WebhookSecret;
+        if (string.IsNullOrWhiteSpace(secret))
+            secret = _options.Secret;
+
+        if (string.IsNullOrWhiteSpace(secret))
+            return Invalid("WEBHOOK_SECRET_NOT_CONFIGURED", "OpenMRS webhook secret is not configured.");
 
         if (string.IsNullOrWhiteSpace(timestampHeader))
             return Invalid("MISSING_TIMESTAMP", "X-OpenMRS-Timestamp is required.");
@@ -48,7 +64,7 @@ public class OpenMrsWebhookSignatureValidator(IOptions<OpenMrsWebhookOptions> op
         }
 
         var providedHex = signatureHeader["sha256=".Length..].Trim();
-        var expectedHex = ComputeSignatureHex(timestampHeader, body, _options.Secret);
+        var expectedHex = ComputeSignatureHex(timestampHeader, body, secret);
 
         if (!FixedTimeEqualsHex(providedHex, expectedHex))
             return Invalid("INVALID_SIGNATURE", "Webhook signature is invalid.", timestamp);

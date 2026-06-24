@@ -1,50 +1,17 @@
 sequenceDiagram
     autonumber
-    participant OM as OpenMRS webhookmodule
-    participant API as OpenMrsWebhooksController
-    participant WS as OpenMrsWebhookService
-    participant W as ReminderWorker
-    participant O as OpenMRS FHIR API
+    participant OM as OpenMRS O3
+    participant API as Webhook Controller
+    participant CFG as Org Config
+    participant SVC as Webhook Service
     participant DB as PostgreSQL
-    participant B as MassTransit Bus
-    participant C as SendReminderConsumer
-    participant P as Messaging Provider
-    participant Pat as Patiënt
 
-    OM->>API: POST /api/webhooks/openmrs/appointments + HMAC headers
-    API->>API: Validate HMAC, timestamp, required headers
-    API->>WS: ProcessAppointmentAsync(event, payload)
-    WS->>DB: Upsert appointment_notifications (encrypted fields)
-    WS->>DB: Insert webhook_event_logs (payload hash)
-    WS->>DB: Create/cancel scheduled_reminders (24h en 1h)
-
-    loop Elke 5 minuten
-        W->>DB: Claim due scheduled_reminders
-        DB-->>W: Reminder dispatch records
-        loop Per due reminder
-            W->>B: Publish SendReminderCommand
-        end
-    end
-
-    B->>C: Deliver SendReminderCommand
-    C->>DB: AlreadySentAsync(encounterId, window)? [idempotentie]
-    DB-->>C: false
-
-    C->>O: GET /Patient/{patientId}
-    O-->>C: PatientContact (telefoon, e-mail)
-
-    alt Patiënt heeft contactgegevens
-        C->>P: SendAsync(provider, recipient, content, type)
-        P-->>C: SendMessageResult (success, messageId)
-        C->>DB: LogAsync(ReminderLog)
-
-        alt Versturen mislukt
-            C-->>B: throw Exception
-            B->>C: Retry (3x met backoff)
-            Note over B,C: Na 3 pogingen → dead-letter queue
-        else Versturen geslaagd
-            C-->>Pat: SMS of e-mail ontvangen
-        end
-    else Geen contactgegevens
-        C->>DB: Mark scheduled reminder failed (NO_CONTACT_DETAILS)
-    end
+    OM->>API: POST appointment event + org id + timestamp + HMAC
+    API->>CFG: Resolve enabled organization
+    API->>API: Validate timestamp and HMAC
+    API->>SVC: Process appointment event
+    SVC->>DB: Deduplicate event id
+    SVC->>DB: Upsert encrypted appointment notification
+    SVC->>DB: Create/cancel 24h and 1h scheduled reminders
+    SVC->>DB: Store selected organization default provider
+    API-->>OM: 200 OK accepted or duplicate

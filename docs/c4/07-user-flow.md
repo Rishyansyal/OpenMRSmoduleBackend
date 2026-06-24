@@ -1,151 +1,71 @@
-# User Flow — Zorgmedewerker
+# API And OpenMRS O3 Flows
 
-De stappen die een zorgmedewerker in de webinterface doorloopt voor de belangrijkste taken.
+The custom web frontend has been removed. Clinicians use OpenMRS O3 for clinical workflows. Backend interactions are OpenMRS webhooks, FHIR calls, Swagger/API clients, and admin endpoints.
 
-## Globale navigatie
+## Clinician Appointment Flow
 
 ```mermaid
 flowchart TD
-    classDef start fill:#dcfce7,stroke:#166534,stroke-width:2px,color:#000
-    classDef page fill:#dbeafe,stroke:#1e40af,stroke-width:1px,color:#000
-    classDef decision fill:#fef3c7,stroke:#92400e,stroke-width:1px,color:#000
-    classDef done fill:#e0e7ff,stroke:#4338ca,stroke-width:2px,color:#000
+    classDef actor fill:#d0ebff,stroke:#1971c2,color:#111
+    classDef system fill:#d3f9d8,stroke:#2b8a3e,color:#111
+    classDef action fill:#fff3bf,stroke:#f08c00,color:#111
 
-    Start([Open applicatie]):::start
-    Login["/login pagina"]:::page
-    AuthCheck{JWT geldig?}:::decision
-    Dashboard["/dashboard — overzicht"]:::page
+    clinician["Clinician"]:::actor
+    o3["OpenMRS O3"]:::system
+    webhook["Signed appointment webhook"]:::action
+    backend["Communication backend"]:::system
+    reminder["Scheduled reminders"]:::action
 
-    Berichten["/dashboard/berichten"]:::page
-    Geschiedenis["/dashboard/geschiedenis"]:::page
-    Patienten["/dashboard/patienten"]:::page
-
-    Start --> AuthCheck
-    AuthCheck -->|nee| Login
-    AuthCheck -->|ja| Dashboard
-    Login -->|login/register ok| Dashboard
-    Dashboard --> Berichten
-    Dashboard --> Geschiedenis
-    Dashboard --> Patienten
-    Berichten -->|terug| Dashboard
-    Geschiedenis -->|terug| Dashboard
-    Patienten -->|terug| Dashboard
-    Dashboard -->|logout| Login
+    clinician -->|"creates/updates appointment"| o3
+    o3 --> webhook
+    webhook --> backend
+    backend --> reminder
 ```
 
-## Flow 1 — Bericht versturen
+## Admin Auth Flow
 
 ```mermaid
 flowchart TD
-    classDef start fill:#dcfce7,stroke:#166534,stroke-width:2px,color:#000
-    classDef action fill:#dbeafe,stroke:#1e40af,stroke-width:1px,color:#000
-    classDef decision fill:#fef3c7,stroke:#92400e,stroke-width:1px,color:#000
-    classDef error fill:#fee2e2,stroke:#991b1b,stroke-width:1px,color:#000
-    classDef done fill:#e0e7ff,stroke:#4338ca,stroke-width:2px,color:#000
+    classDef action fill:#d0ebff,stroke:#1971c2,color:#111
+    classDef decision fill:#fff3bf,stroke:#f08c00,color:#111
+    classDef done fill:#d3f9d8,stroke:#2b8a3e,color:#111
+    classDef error fill:#ffe3e3,stroke:#c92a2a,color:#111
 
-    Start([Klik 'Berichten' op dashboard]):::start
-    LoadProv["GET /api/messages/providers"]:::action
-    SelectProv["Selecteer provider<br/>(SwiftSend / SecurePost / LegacyLink / AsyncFlow)"]:::action
-    FillForm["Vul ontvangers, type (SMS/email/push) en bericht in"]:::action
-    Send["POST /api/messages"]:::action
-    Rate{"Rate limit<br/>(10/min)?"}:::decision
-    Provider{"Provider call<br/>succesvol?"}:::decision
-    Log["Message-log opgeslagen<br/>(provider, type, success, recipient_count)"]:::action
-    Result(["Toon resultaat in UI"]):::done
-    Err429(["⚠️ 429 — wacht 1 min"]):::error
-    ErrProv(["❌ Foutmelding tonen"]):::error
+    seed["Startup seeds admin from Admin:Email/Admin:Password"]:::action
+    login["POST /auth/login"]:::action
+    valid{"credentials valid?"}:::decision
+    token["JWT returned"]:::done
+    reject["401 Unauthorized"]:::error
+    register["POST /auth/register"]:::action
+    public{"AllowPublicRegistration?"}:::decision
+    forbid["403 PUBLIC_REGISTRATION_DISABLED"]:::error
 
-    Start --> LoadProv --> SelectProv --> FillForm --> Send
-    Send --> Rate
-    Rate -->|nee, limit hit| Err429
-    Rate -->|ja| Provider
-    Provider -->|ja| Log --> Result
-    Provider -->|nee| ErrProv
+    seed --> login
+    login --> valid
+    valid -->|yes| token
+    valid -->|no| reject
+    register --> public
+    public -->|no| forbid
+    public -->|yes| token
 ```
 
-## Flow 2 — Patiënt zoeken en details inzien
+## Direct Message API Flow
 
 ```mermaid
 flowchart TD
-    classDef start fill:#dcfce7,stroke:#166534,stroke-width:2px,color:#000
-    classDef action fill:#dbeafe,stroke:#1e40af,stroke-width:1px,color:#000
-    classDef decision fill:#fef3c7,stroke:#92400e,stroke-width:1px,color:#000
-    classDef done fill:#e0e7ff,stroke:#4338ca,stroke-width:2px,color:#000
+    classDef action fill:#d0ebff,stroke:#1971c2,color:#111
+    classDef decision fill:#fff3bf,stroke:#f08c00,color:#111
+    classDef done fill:#d3f9d8,stroke:#2b8a3e,color:#111
+    classDef error fill:#ffe3e3,stroke:#c92a2a,color:#111
 
-    Start([Klik 'Patiënten' op dashboard]):::start
-    Input["Typ zoekterm (naam)"]:::action
-    Search["GET /api/openmrs/patients?q=..."]:::action
-    Fhir["Backend → OpenMRS FHIR R4"]:::action
-    List["Toon lijst met patiënten<br/>(naam, telefoon, email)"]:::action
-    Detail{Klik op<br/>patiënt?}:::decision
-    Get["GET /api/openmrs/patients/{id}"]:::action
-    Show(["Toon contactgegevens"]):::done
-    Appoint{Klik op<br/>'Afspraken'?}:::decision
-    GetApp["GET /api/openmrs/appointments"]:::action
-    ShowApp(["Toon aankomende afspraken"]):::done
+    client["Swagger/API client with JWT"]:::action
+    providers["GET /api/messages/providers"]:::action
+    send["POST /api/messages with explicit provider"]:::action
+    ok{"provider send success?"}:::decision
+    log["message_logs row"]:::done
+    fail["error returned/logged; no provider fallback"]:::error
 
-    Start --> Input --> Search --> Fhir --> List
-    List --> Detail
-    Detail -->|ja| Get --> Show
-    Show --> Appoint
-    Appoint -->|ja| GetApp --> ShowApp
-```
-
-## Flow 3 — Geschiedenis bekijken
-
-```mermaid
-flowchart TD
-    classDef start fill:#dcfce7,stroke:#166534,stroke-width:2px,color:#000
-    classDef action fill:#dbeafe,stroke:#1e40af,stroke-width:1px,color:#000
-    classDef decision fill:#fef3c7,stroke:#92400e,stroke-width:1px,color:#000
-    classDef done fill:#e0e7ff,stroke:#4338ca,stroke-width:2px,color:#000
-
-    Start([Klik 'Geschiedenis' op dashboard]):::start
-    Load["GET /api/messages/history"]:::action
-    Render["Tabel: provider, type, success, sent_at, recipient_count"]:::action
-    Async{Async bericht<br/>met trackingId?}:::decision
-    Poll["GET /api/messages/status/{trackingId}"]:::action
-    UpdateStatus(["Status bijwerken in UI"]):::done
-    Done(["Lijst getoond"]):::done
-
-    Start --> Load --> Render
-    Render --> Async
-    Async -->|ja| Poll --> UpdateStatus
-    Async -->|nee| Done
-```
-
-## Flow 4 — Login / registratie
-
-```mermaid
-flowchart TD
-    classDef start fill:#dcfce7,stroke:#166534,stroke-width:2px,color:#000
-    classDef action fill:#dbeafe,stroke:#1e40af,stroke-width:1px,color:#000
-    classDef decision fill:#fef3c7,stroke:#92400e,stroke-width:1px,color:#000
-    classDef error fill:#fee2e2,stroke:#991b1b,stroke-width:1px,color:#000
-    classDef done fill:#e0e7ff,stroke:#4338ca,stroke-width:2px,color:#000
-
-    Start([Open /login]):::start
-    Choice{Account?}:::decision
-    Reg["Vul e-mail + wachtwoord<br/>(min 12 tekens, cijfer+letter)"]:::action
-    PostReg["POST /auth/register"]:::action
-    Login["Vul e-mail + wachtwoord"]:::action
-    PostLogin["POST /auth/login"]:::action
-    Rate{"Rate limit<br/>(5/min)?"}:::decision
-    Valid{"Credentials<br/>geldig?"}:::decision
-    Lock{"Account<br/>gelocked?"}:::decision
-    Store["JWT opslaan in localStorage"]:::action
-    Redirect(["Redirect → /dashboard"]):::done
-    Err429(["⚠️ Te veel pogingen"]):::error
-    ErrAuth(["❌ Verkeerde credentials"]):::error
-    ErrLock(["🔒 Account 5 min gelocked"]):::error
-
-    Start --> Choice
-    Choice -->|nee| Reg --> PostReg --> Store
-    Choice -->|ja| Login --> PostLogin --> Rate
-    Rate -->|hit| Err429
-    Rate -->|ok| Lock
-    Lock -->|ja| ErrLock
-    Lock -->|nee| Valid
-    Valid -->|ja| Store --> Redirect
-    Valid -->|nee| ErrAuth
+    client --> providers --> send --> ok
+    ok -->|yes| log
+    ok -->|no| fail
 ```

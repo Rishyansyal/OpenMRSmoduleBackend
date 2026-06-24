@@ -1,137 +1,83 @@
-# Deployment Diagram — OpenMRS Communicatiemodule
+# Deployment
 
-Hoe het systeem fysiek wordt gedeployd: containers, netwerken, poorten en volumes. Gebaseerd op de drie `docker-compose.yml` bestanden.
+The deployment keeps the backend, PostgreSQL, and message broker separate from OpenMRS O3. OpenMRS remains the clinical UI and EMR. The backend is not paired with a custom Next.js frontend.
 
-## Lokale ontwikkelomgeving (Docker Compose)
-
-```mermaid
-flowchart TB
-    classDef host fill:#f1f5f9,stroke:#475569,stroke-width:2px,color:#000
-    classDef network fill:#fef9c3,stroke:#a16207,stroke-width:1px,color:#000
-    classDef container fill:#dbeafe,stroke:#1e40af,stroke-width:1px,color:#000
-    classDef db fill:#fce7f3,stroke:#9d174d,stroke-width:1px,color:#000
-    classDef ext fill:#e0e7ff,stroke:#4338ca,stroke-width:1px,color:#000
-    classDef volume fill:#dcfce7,stroke:#166534,stroke-width:1px,color:#000
-
-    subgraph Host["💻 Developer Machine (Docker Desktop)"]
-        Browser["🌐 Browser<br/>localhost:3001"]:::ext
-
-        subgraph netFront["frontend network"]
-            FE["📦 frontend<br/>Next.js 16<br/>:3001"]:::container
-        end
-
-        subgraph netBackend["backend network (bridge)"]
-            API["📦 api<br/>ASP.NET Core 10<br/>:5111 → :8080<br/>read-only, no-new-privileges, cap_drop ALL"]:::container
-            DB[("📦 db<br/>PostgreSQL 17<br/>internal only<br/>no port binding")]:::db
-            VolPG[("💾 pgdata volume")]:::volume
-        end
-
-        subgraph netOMRS["openmrs network"]
-            GW["📦 gateway<br/>:3032 → :80"]:::container
-            OMFE["📦 openmrs-frontend"]:::container
-            OMBE["📦 openmrs-backend"]:::container
-            OMDB[("📦 mariadb 10.11")]:::db
-            VolOMRS[("💾 openmrs-data")]:::volume
-            VolDB[("💾 db-data")]:::volume
-        end
-
-        FAKE["📦 fakecomworld<br/>:1337 → :8080<br/>standalone container"]:::container
-    end
-
-    Browser -->|HTTPS in prod / HTTP dev| FE
-    FE -->|fetch /api/* met JWT| API
-    API -->|TCP 5432| DB
-    DB --> VolPG
-    API -.->|HTTPS :3032| GW
-    GW --> OMFE
-    GW --> OMBE
-    OMBE --> OMDB
-    OMBE --> VolOMRS
-    OMDB --> VolDB
-    API -.->|HTTPS :1337| FAKE
-    OMBE -.->|signed webhook POST /api/webhooks/openmrs/appointments| API
-```
-
-## Container-overzicht
-
-| Container | Image | Poorten | Volume | Security |
-|---|---|---|---|---|
-| `api` | `OpenMRSmoduleBackend` (custom build) | `127.0.0.1:5111 → 8080` | tmpfs `/tmp` | read_only, cap_drop ALL, no-new-privileges |
-| `db` | `postgres:17-alpine` | — (internal only) | `pgdata` | no-new-privileges |
-| `frontend` | `openmrsmodulefrontend` (custom build) | `3001:3001` | — | — |
-| `gateway` | `openmrs/openmrs-reference-application-3-gateway:qa` | `3032:80` | — | — |
-| `openmrs-frontend` | `openmrs/openmrs-reference-application-3-frontend:qa` | — | — | — |
-| `openmrs-backend` | `openmrs/openmrs-reference-application-3-backend:qa` | `5005:5005` (debug) | `openmrs-data` | — |
-| `openmrs-db` | `mariadb:10.11.7` | — | `db-data` | — |
-| `fakecomworld` | `ghcr.io/avansict/in2.4-fakecomworld:main` | `1337:8080` | — | — |
-
-## Productie deployment (target architectuur)
+## Local Development
 
 ```mermaid
 flowchart TB
-    classDef extuser fill:#fef3c7,stroke:#92400e,stroke-width:2px,color:#000
-    classDef edge fill:#dbeafe,stroke:#1e40af,stroke-width:2px,color:#000
-    classDef pod fill:#dcfce7,stroke:#166534,stroke-width:1px,color:#000
-    classDef db fill:#fce7f3,stroke:#9d174d,stroke-width:1px,color:#000
-    classDef ext fill:#e0e7ff,stroke:#4338ca,stroke-width:1px,color:#000
+    classDef host fill:#f8f9fa,stroke:#495057,color:#111
+    classDef container fill:#d0ebff,stroke:#1971c2,color:#111
+    classDef db fill:#d3f9d8,stroke:#2b8a3e,color:#111
+    classDef queue fill:#e5dbff,stroke:#5f3dc4,color:#111
+    classDef ext fill:#ffe8cc,stroke:#d9480f,color:#111
 
-    Zorg["👤 Zorgmedewerker<br/>(browser)"]:::extuser
-
-    subgraph DMZ["DMZ / Edge"]
-        LB["🛡️ Reverse proxy<br/>TLS 1.3 terminatie<br/>HSTS + HTTPS-redirect"]:::edge
+    subgraph host["Developer machine"]
+        browser["Browser<br/>OpenMRS O3"]:::ext
+        fake["FakeComWorld<br/>localhost:1337"]:::ext
+        openmrs["OpenMRS O3 compose<br/>gateway :3032, backend, frontend, MariaDB"]:::container
+        api["OpenMRSmoduleBackend api<br/>localhost:5111"]:::container
+        pg[("PostgreSQL<br/>backend network only")]:::db
+        bus["RabbitMQ / MassTransit<br/>required outside IntegrationTest"]:::queue
     end
 
-    subgraph App["Applicatie-tier"]
-        FEpod["📦 frontend (Next.js)<br/>:3001"]:::pod
-        APIpod["📦 api (ASP.NET Core)<br/>:8080"]:::pod
-        Bus["📦 RabbitMQ<br/>:5672"]:::pod
-    end
-
-    subgraph Data["Data-tier (privénetwerk)"]
-        PG[("🗄️ PostgreSQL 17<br/>:5432<br/>backups, AES-at-rest")]:::db
-    end
-
-    subgraph Obs["Observability"]
-        Prom["📊 Prometheus scrape<br/>/metrics"]:::pod
-    end
-
-    subgraph Ext["Externe systemen"]
-        OMRS["💻 OpenMRS EMR<br/>FHIR R4 + webhooks"]:::ext
-        Prov["💻 Messaging Providers<br/>SwiftSend / SecurePost / LegacyLink / AsyncFlow"]:::ext
-    end
-
-    Zorg -->|HTTPS :443| LB
-    LB -->|HTTP :3001| FEpod
-    LB -->|HTTP :8080| APIpod
-    OMRS -->|signed webhook :443| LB
-    FEpod -.->|server-side| APIpod
-    APIpod --> PG
-    APIpod --> Bus
-    Bus --> APIpod
-    APIpod --> OMRS
-    APIpod --> Prov
-    APIpod --> Prom
+    browser --> openmrs
+    openmrs -->|"signed webhook"| api
+    api -->|"FHIR R4"| openmrs
+    api -->|"SQL"| pg
+    api -->|"publish/consume"| bus
+    api -->|"provider API"| fake
 ```
 
-## Security & netwerk-eisen
+## Production Target
 
-| Maatregel | Implementatie |
-|---|---|
-| **TLS 1.3** | Reverse proxy in productie. `app.UseHsts()` + `UseHttpsRedirection()` in Program.cs |
-| **DB-isolatie** | PostgreSQL geen public port binding (`docker-compose.yml`). Alleen `backend`-netwerk |
-| **API-isolatie** | API gebind op `127.0.0.1:5111` in dev (`API_PORT=127.0.0.1:5111`) |
-| **Container hardening** | `read_only: true`, `cap_drop: ALL`, `no-new-privileges:true`, tmpfs `/tmp` |
-| **Secrets** | `.env`-file, nooit in image of compose-defaults ([ADR-0006](../adr/0006-secrets-via-env-file.md)) |
-| **CORS** | Whitelist via `ALLOWED_ORIGINS`, geen wildcard |
-| **Rate limiting** | Per-IP: 5/min auth, 10/min messaging, 100/min global |
-| **AES-256-GCM** | PII bij rust in DB (encounter_id, patient data) |
+```mermaid
+flowchart TB
+    classDef edge fill:#d0ebff,stroke:#1971c2,color:#111
+    classDef app fill:#d3f9d8,stroke:#2b8a3e,color:#111
+    classDef db fill:#ffe3e3,stroke:#c92a2a,color:#111
+    classDef queue fill:#e5dbff,stroke:#5f3dc4,color:#111
+    classDef ext fill:#f1f3f5,stroke:#495057,color:#111
 
-## Opstartvolgorde
+    clinician["Clinician"]:::ext
+    openmrs["OpenMRS O3 deployments<br/>one or more hospitals"]:::ext
+    providers["Messaging providers"]:::ext
 
-`start.sh` start de stack in deze volgorde:
-1. **FakeComWorld** — standalone container (geen netwerkafhankelijkheid)
-2. **OpenMRS distro** — gateway + frontend + backend + mariadb (~2 min)
-3. **Backend + Postgres** — eigen compose, leest `.env`
-4. **Frontend** — Next.js, hangt aan backend
+    subgraph edge["Edge"]
+        proxy["Reverse proxy<br/>TLS termination, HSTS, routing"]:::edge
+    end
 
-Het script sourcet credentials uit `OpenMRSmoduleBackend/.env` zodat er één bron van waarheid is.
+    subgraph app["Application tier"]
+        api1["API pod<br/>controllers, workers, consumers"]:::app
+        api2["API pod<br/>optional horizontal scale"]:::app
+        rabbit["RabbitMQ<br/>durable queues, retries, dead letters"]:::queue
+    end
+
+    subgraph data["Data tier"]
+        pg[("PostgreSQL<br/>encrypted config, appointment state, retry ledger, audit logs")]:::db
+    end
+
+    prometheus["Prometheus<br/>scrapes /metrics"]:::ext
+
+    clinician -->|"uses"| openmrs
+    openmrs -->|"signed webhooks HTTPS"| proxy
+    proxy --> api1
+    proxy --> api2
+    api1 --> pg
+    api2 --> pg
+    api1 <--> rabbit
+    api2 <--> rabbit
+    api1 -->|"FHIR R4"| openmrs
+    api2 -->|"FHIR R4"| openmrs
+    api1 --> providers
+    api2 --> providers
+    prometheus --> api1
+    prometheus --> api2
+```
+
+## Notes
+
+- RabbitMQ is required for development, staging, and production delivery. Only `IntegrationTest` uses in-memory MassTransit.
+- PostgreSQL is the source of truth for retry state; RabbitMQ is the transport, not the business ledger.
+- Multiple OpenMRS O3 deployments are separated by organization id and per-org secrets.
+- Provider fallback is not automatic. Operational retry targets the same configured provider.

@@ -1,3 +1,4 @@
+using Application.Auth;
 using Infrastructure.DataRetention;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -6,7 +7,7 @@ namespace Api.Controllers;
 
 [ApiController]
 [Route("api/data-retention")]
-[Authorize]
+[Authorize(Policy = AuthPolicies.AdminOnly)]
 public class DataRetentionController(DataRetentionWorker worker) : ControllerBase
 {
     /// <summary>Handmatig een cleanup-run starten — handig voor testen.</summary>

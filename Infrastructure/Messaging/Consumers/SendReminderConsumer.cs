@@ -16,6 +16,7 @@ public class SendReminderConsumer(
     IReminderLogRepository reminderLogRepository,
     IScheduledReminderRepository scheduledReminderRepository,
     IMessageTemplateRepository messageTemplateRepository,
+    IReminderMessageRenderer reminderMessageRenderer,
     MessagingMetrics metrics,
     ILogger<SendReminderConsumer> logger) : IConsumer<SendReminderCommand>
 {
@@ -27,19 +28,25 @@ public class SendReminderConsumer(
         // Idempotentie: skip als al succesvol verstuurd (kan voorkomen bij retry)
         if (await reminderLogRepository.AlreadySentAsync(cmd.EncounterId, cmd.ReminderWindow, ct))
         {
-            logger.LogDebug("Herinnering ({window}) voor encounter {id} al verstuurd — overgeslagen.",
-                cmd.ReminderWindow, cmd.EncounterId);
+            logger.LogDebug("Herinnering ({window}) voor reminder {id} al verstuurd — overgeslagen.",
+                cmd.ReminderWindow, cmd.ScheduledReminderId);
             return;
         }
 
-        var patient = await openMrsService.GetPatientAsync(cmd.PatientId, ct);
+        await scheduledReminderRepository.MarkSendingAsync(cmd.ScheduledReminderId, ct);
+        await scheduledReminderRepository.MarkConsumedAsync(cmd.ScheduledReminderId, ct);
+
+        var patient = await openMrsService.GetPatientAsync(cmd.OrganizationId, cmd.PatientId, ct);
         if (patient is null)
         {
-            logger.LogWarning("Patiënt niet gevonden voor encounter {enc}.",
-                cmd.EncounterId);
-            await scheduledReminderRepository.MarkFailedAsync(
+            logger.LogWarning("Patiënt niet gevonden voor reminder {id}.",
+                cmd.ScheduledReminderId);
+            await scheduledReminderRepository.RecordDeliveryAttemptAsync(
                 cmd.ScheduledReminderId,
-                "PATIENT_NOT_FOUND",
+                success: false,
+                retryable: false,
+                providerMessageId: null,
+                errorCode: "PATIENT_NOT_FOUND",
                 ct);
             return;
         }
@@ -47,23 +54,34 @@ public class SendReminderConsumer(
         var recipient = patient.Phone ?? patient.Email;
         if (recipient is null)
         {
-            logger.LogInformation("Patiënt voor encounter {enc} heeft geen contactgegevens — herinnering overgeslagen.",
-                cmd.EncounterId);
-            await scheduledReminderRepository.MarkFailedAsync(
+            logger.LogInformation("Patiënt voor reminder {id} heeft geen contactgegevens — herinnering overgeslagen.",
+                cmd.ScheduledReminderId);
+            await scheduledReminderRepository.RecordDeliveryAttemptAsync(
                 cmd.ScheduledReminderId,
-                "NO_CONTACT_DETAILS",
+                success: false,
+                retryable: false,
+                providerMessageId: null,
+                errorCode: "NO_CONTACT_DETAILS",
                 ct);
             return;
         }
 
         var type = patient.Phone is not null ? "SMS" : "EMAIL";
         var template = await messageTemplateRepository.GetByWindowAsync(cmd.ReminderWindow, ct);
-        var content = BuildMessage(cmd, template?.Body);
+        var content = reminderMessageRenderer.Render(
+            new ReminderMessageContext(
+                cmd.ReminderWindow,
+                cmd.EncounterStart,
+                cmd.ServiceType,
+                cmd.Location,
+                cmd.Instructions),
+            template?.Body);
 
         var sw = Stopwatch.StartNew();
         var result = await messagingService.SendAsync(
             cmd.Provider,
             new SendMessageRequest([recipient], content, type),
+            cmd.OrganizationId,
             ct);
         sw.Stop();
 
@@ -82,41 +100,42 @@ public class SendReminderConsumer(
 
         if (result.Success)
         {
-            await scheduledReminderRepository.MarkSentAsync(cmd.ScheduledReminderId, ct);
-            logger.LogInformation("Herinnering ({window}) verstuurd voor encounter {enc}.",
-                cmd.ReminderWindow, cmd.EncounterId);
+            await scheduledReminderRepository.RecordDeliveryAttemptAsync(
+                cmd.ScheduledReminderId,
+                success: true,
+                retryable: false,
+                providerMessageId: result.MessageId,
+                errorCode: null,
+                ct);
+            logger.LogInformation("Herinnering ({window}) verstuurd voor reminder {id}.",
+                cmd.ReminderWindow, cmd.ScheduledReminderId);
             return;
         }
 
-        await scheduledReminderRepository.MarkFailedAsync(
+        var retryable = IsRetryableSendError(result.Error);
+        await scheduledReminderRepository.RecordDeliveryAttemptAsync(
             cmd.ScheduledReminderId,
-            "SEND_ERROR",
+            success: false,
+            retryable,
+            providerMessageId: result.MessageId,
+            errorCode: retryable ? "SEND_RETRYABLE" : "SEND_PERMANENT",
             ct);
-
-        // Gooi een exception zodat MassTransit de retry-policy triggert
-        throw new InvalidOperationException(
-            $"Versturen mislukt voor encounter {cmd.EncounterId}: {result.Error}");
     }
 
-    private static string BuildMessage(SendReminderCommand cmd, string? templateBody)
+    private static bool IsRetryableSendError(string? error)
     {
-        var timeStr = cmd.EncounterStart.ToLocalTime().ToString(
-            "dddd d MMMM 'om' HH:mm",
-            new System.Globalization.CultureInfo("nl-NL"));
-        var serviceType = cmd.ServiceType ?? "afspraak";
-        var location = string.IsNullOrWhiteSpace(cmd.Location) ? "locatie onbekend" : cmd.Location!;
-        var instructions = string.IsNullOrWhiteSpace(cmd.Instructions) ? "" : cmd.Instructions!;
+        if (string.IsNullOrWhiteSpace(error))
+            return true;
 
-        var body = templateBody ?? (cmd.ReminderWindow == "24h"
-            ? "Herinnering: u heeft morgen een {type} op {tijd} bij {locatie}.{instructies} Neem contact op bij vragen."
-            : "Herinnering: u heeft over ongeveer 1 uur een {type} op {tijd} bij {locatie}.{instructies}");
-
-        var instructionsBlock = string.IsNullOrEmpty(instructions) ? "" : $" Belangrijk: {instructions}.";
-
-        return body
-            .Replace("{type}", serviceType)
-            .Replace("{tijd}", timeStr)
-            .Replace("{locatie}", location)
-            .Replace("{instructies}", instructionsBlock);
+        var normalized = error.ToLowerInvariant();
+        return normalized.Contains("timeout", StringComparison.Ordinal) ||
+               normalized.Contains("temporar", StringComparison.Ordinal) ||
+               normalized.Contains("connection", StringComparison.Ordinal) ||
+               normalized.Contains("network", StringComparison.Ordinal) ||
+               normalized.Contains("token", StringComparison.Ordinal) ||
+               normalized.Contains("http 408", StringComparison.Ordinal) ||
+               normalized.Contains("http 429", StringComparison.Ordinal) ||
+               normalized.Contains("http 5", StringComparison.Ordinal);
     }
+
 }

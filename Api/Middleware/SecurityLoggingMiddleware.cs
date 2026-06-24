@@ -12,14 +12,14 @@ public class SecurityLoggingMiddleware(RequestDelegate next, ILogger<SecurityLog
 
         if (context.Response.StatusCode == StatusCodes.Status401Unauthorized)
         {
-            logger.LogWarning("Security Event: Unauthorized access attempt to {Path} from IP {IpAddress}", 
-                context.Request.Path, 
+            logger.LogWarning("Security Event: Unauthorized access attempt to {Path} from IP {IpAddress}",
+                context.Request.Path,
                 context.Connection.RemoteIpAddress);
         }
         else if (context.Response.StatusCode == StatusCodes.Status403Forbidden)
         {
-            logger.LogWarning("Security Event: Forbidden access attempt to {Path} from IP {IpAddress} by User {User}", 
-                context.Request.Path, 
+            logger.LogWarning("Security Event: Forbidden access attempt to {Path} from IP {IpAddress} by User {User}",
+                context.Request.Path,
                 context.Connection.RemoteIpAddress,
                 context.User?.Identity?.Name ?? "Unknown");
         }

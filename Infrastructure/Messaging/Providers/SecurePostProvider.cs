@@ -30,12 +30,31 @@ public class SecurePostProvider : IMessageProvider
         IOptions<MessagingOptions> messagingOptions)
     {
         _httpClientFactory = httpClientFactory;
-        _options           = options.Value;
-        _studentGroup      = messagingOptions.Value.StudentGroup;
+        _options = options.Value;
+        _studentGroup = messagingOptions.Value.StudentGroup;
     }
 
-    private async Task<string?> GetTokenAsync(CancellationToken ct)
+    private async Task<string?> GetTokenAsync(
+        MessageProviderConfiguration? configuration,
+        CancellationToken ct)
     {
+        if (configuration is not null)
+        {
+            var client = _httpClientFactory.CreateClient();
+            using var request = new HttpRequestMessage(HttpMethod.Post, $"{configuration.BaseUrl}/securepost/auth");
+            request.Headers.Add("X-STUDENT-GROUP", configuration.StudentGroup);
+            request.Content = JsonContent.Create(new
+            {
+                clientId = configuration.GetCredential("clientId"),
+                clientSecret = configuration.GetCredential("clientSecret")
+            });
+
+            var response = await client.SendAsync(request, ct);
+            if (!response.IsSuccessStatusCode) return null;
+            var tokenResponse = await response.Content.ReadFromJsonAsync<TokenResponse>(cancellationToken: ct);
+            return tokenResponse?.AccessToken;
+        }
+
         // Fast path: token nog geldig (geen lock nodig)
         if (_cachedToken is not null && DateTime.UtcNow < _tokenExpiresAt)
             return _cachedToken;
@@ -52,7 +71,7 @@ public class SecurePostProvider : IMessageProvider
             request.Headers.Add("X-STUDENT-GROUP", _studentGroup);
             request.Content = JsonContent.Create(new
             {
-                clientId     = _options.ClientId,
+                clientId = _options.ClientId,
                 clientSecret = _options.ClientSecret
             });
 
@@ -82,7 +101,7 @@ public class SecurePostProvider : IMessageProvider
         await _tokenLock.WaitAsync(ct);
         try
         {
-            _cachedToken    = null;
+            _cachedToken = null;
             _tokenExpiresAt = DateTime.MinValue;
         }
         finally
@@ -91,7 +110,10 @@ public class SecurePostProvider : IMessageProvider
         }
     }
 
-    public async Task<SendMessageResult> SendAsync(SendMessageRequest request, CancellationToken ct = default)
+    public async Task<SendMessageResult> SendAsync(
+        SendMessageRequest request,
+        MessageProviderConfiguration? configuration = null,
+        CancellationToken ct = default)
     {
         var failedRecipients = new List<string>();
         string? lastTrackingId = null;
@@ -99,7 +121,7 @@ public class SecurePostProvider : IMessageProvider
 
         foreach (var recipient in request.Recipients)
         {
-            var (success, trackingId, error) = await SendSingleAsync(recipient, request, ct);
+            var (success, trackingId, error) = await SendSingleAsync(recipient, request, configuration, ct);
             if (success)
                 lastTrackingId = trackingId;
             else
@@ -114,23 +136,28 @@ public class SecurePostProvider : IMessageProvider
     }
 
     private async Task<(bool Success, string? TrackingId, string? Error)> SendSingleAsync(
-        string recipient, SendMessageRequest request, CancellationToken ct)
+        string recipient,
+        SendMessageRequest request,
+        MessageProviderConfiguration? configuration,
+        CancellationToken ct)
     {
-        string? token = await GetTokenAsync(ct);
+        string? token = await GetTokenAsync(configuration, ct);
         if (token is null) return (false, null, "Failed to obtain SecurePost token");
+        var baseUrl = configuration?.BaseUrl ?? _options.BaseUrl;
+        var studentGroup = configuration?.StudentGroup ?? _studentGroup;
 
         for (var attempt = 0; attempt < 2; attempt++)
         {
             var client = _httpClientFactory.CreateClient();
-            using var httpRequest = new HttpRequestMessage(HttpMethod.Post, $"{_options.BaseUrl}/securepost/message");
+            using var httpRequest = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/securepost/message");
             httpRequest.Headers.Add("Authorization", $"Bearer {token}");
-            httpRequest.Headers.Add("X-STUDENT-GROUP", _studentGroup);
+            httpRequest.Headers.Add("X-STUDENT-GROUP", studentGroup);
             httpRequest.Content = JsonContent.Create(new
             {
-                format    = request.Type,
+                format = request.Type,
                 recipient,
-                body      = request.Content,
-                subject   = request.Subject
+                body = request.Content,
+                subject = request.Subject
             });
 
             var response = await client.SendAsync(httpRequest, ct);
@@ -138,8 +165,9 @@ public class SecurePostProvider : IMessageProvider
             if (response.StatusCode == HttpStatusCode.Unauthorized && attempt == 0)
             {
                 // Invalideert token BINNEN lock om race condition te voorkomen
-                await InvalidateTokenAsync(ct);
-                token = await GetTokenAsync(ct);
+                if (configuration is null)
+                    await InvalidateTokenAsync(ct);
+                token = await GetTokenAsync(configuration, ct);
                 if (token is null) return (false, null, "Token refresh failed");
                 continue;
             }

@@ -1,11 +1,10 @@
 using System.Security.Cryptography;
 using System.Text;
 using Application.OpenMrs;
+using Application.Organizations;
 using Application.Webhooks;
-using Infrastructure.OpenMrs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Options;
 
 namespace Api.Controllers;
 
@@ -15,10 +14,13 @@ namespace Api.Controllers;
 public class OpenMrsController(
     IOpenMrsService openMrsService,
     IOpenMrsWebhookService webhookService,
-    IOptions<OpenMrsPollerOptions> pollerOptions) : ControllerBase
+    IOrganizationConfigRepository organizationConfigs) : ControllerBase
 {
     [HttpGet("patients")]
-    public async Task<IActionResult> SearchPatients([FromQuery] string q, CancellationToken ct)
+    public async Task<IActionResult> SearchPatients(
+        [FromQuery] string q,
+        [FromQuery] string? organizationId,
+        CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(q))
             return BadRequest(new { error = "Zoekterm 'q' is verplicht" });
@@ -26,42 +28,70 @@ public class OpenMrsController(
         if (q.Length > 100)
             return BadRequest(new { error = "Zoekterm 'q' mag maximaal 100 tekens lang zijn." });
 
-        var patients = await openMrsService.SearchPatientsAsync(q, ct);
+        var org = await ResolveOrganizationIdAsync(organizationId, ct);
+        if (org is null) return BadRequest(new { error = "OPENMRS_ORGANIZATION_NOT_CONFIGURED" });
+
+        var patients = await openMrsService.SearchPatientsAsync(org, q, ct);
         return Ok(patients);
     }
 
     [HttpGet("patients/{id}")]
-    public async Task<IActionResult> GetPatient(string id, CancellationToken ct)
+    public async Task<IActionResult> GetPatient(
+        string id,
+        [FromQuery] string? organizationId,
+        CancellationToken ct)
     {
-        var patient = await openMrsService.GetPatientAsync(id, ct);
+        var org = await ResolveOrganizationIdAsync(organizationId, ct);
+        if (org is null) return BadRequest(new { error = "OPENMRS_ORGANIZATION_NOT_CONFIGURED" });
+
+        var patient = await openMrsService.GetPatientAsync(org, id, ct);
         return patient is null ? NotFound() : Ok(patient);
     }
 
     [HttpGet("appointments")]
-    public async Task<IActionResult> GetUpcomingAppointments(CancellationToken ct)
+    public async Task<IActionResult> GetUpcomingAppointments(
+        [FromQuery] string? organizationId,
+        CancellationToken ct)
     {
-        var appointments = await openMrsService.GetUpcomingAppointmentsAsync(ct);
+        var org = await ResolveOrganizationIdAsync(organizationId, ct);
+        if (org is null) return BadRequest(new { error = "OPENMRS_ORGANIZATION_NOT_CONFIGURED" });
+
+        var appointments = await openMrsService.GetUpcomingAppointmentsAsync(org, ct);
         return Ok(appointments);
     }
 
     [HttpGet("visit-types")]
-    public async Task<IActionResult> GetVisitTypes(CancellationToken ct) =>
-        Ok(await openMrsService.GetVisitTypesAsync(ct));
+    public async Task<IActionResult> GetVisitTypes([FromQuery] string? organizationId, CancellationToken ct)
+    {
+        var org = await ResolveOrganizationIdAsync(organizationId, ct);
+        if (org is null) return BadRequest(new { error = "OPENMRS_ORGANIZATION_NOT_CONFIGURED" });
+        return Ok(await openMrsService.GetVisitTypesAsync(org, ct));
+    }
 
     [HttpGet("locations")]
-    public async Task<IActionResult> GetLocations(CancellationToken ct) =>
-        Ok(await openMrsService.GetLocationsAsync(ct));
+    public async Task<IActionResult> GetLocations([FromQuery] string? organizationId, CancellationToken ct)
+    {
+        var org = await ResolveOrganizationIdAsync(organizationId, ct);
+        if (org is null) return BadRequest(new { error = "OPENMRS_ORGANIZATION_NOT_CONFIGURED" });
+        return Ok(await openMrsService.GetLocationsAsync(org, ct));
+    }
 
     [HttpPost("visits")]
-    public async Task<IActionResult> CreateVisit([FromBody] CreateVisitRequest request, CancellationToken ct)
+    public async Task<IActionResult> CreateVisit(
+        [FromBody] CreateVisitRequest request,
+        [FromQuery] string? organizationId,
+        CancellationToken ct)
     {
         if (!ModelState.IsValid)
             return BadRequest(ModelState);
 
+        var org = await ResolveOrganizationIdAsync(organizationId, ct);
+        if (org is null) return BadRequest(new { error = "OPENMRS_ORGANIZATION_NOT_CONFIGURED" });
+
         UpcomingAppointment appointment;
         try
         {
-            appointment = await openMrsService.CreateVisitAsync(request, ct);
+            appointment = await openMrsService.CreateVisitAsync(org, request, ct);
         }
         catch (InvalidOperationException ex)
         {
@@ -84,7 +114,7 @@ public class OpenMrsController(
         var result = await webhookService.ProcessAppointmentAsync(
             eventId,
             eventType: "MANUAL",
-            organizationId: pollerOptions.Value.OrganizationId,
+            organizationId: org,
             eventTimestamp: DateTimeOffset.UtcNow,
             payload: payload,
             ct);
@@ -97,6 +127,14 @@ public class OpenMrsController(
             appointment.ServiceType,
             appointment.Location,
             reminderCount));
+    }
+
+    private async Task<string?> ResolveOrganizationIdAsync(string? organizationId, CancellationToken ct)
+    {
+        if (!string.IsNullOrWhiteSpace(organizationId))
+            return await organizationConfigs.GetByIdAsync(organizationId, ct) is null ? null : organizationId;
+
+        return (await organizationConfigs.GetDefaultAsync(ct))?.OrganizationId;
     }
 
     private static int CountFutureReminders(DateTime startUtc)
