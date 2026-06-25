@@ -150,6 +150,30 @@ public sealed class AuthorizationTests(BackendIntegrationTestFactory factory) :
     }
 
     // ------------------------------------------------------------------
+    // 5. Admin endpoints (AuthPolicies.AdminOnly)
+    // ------------------------------------------------------------------
+
+    [Theory]
+    [InlineData("GET", "/api/reminders/history")]
+    [InlineData("GET", "/api/reminders/scheduled")]
+    [InlineData("GET", "/api/reminders/templates")]
+    [InlineData("POST", "/api/reminders/trigger")]
+    [InlineData("POST", "/api/data-retention/trigger")]
+    public async Task NormalUser_CannotAccess_AdminEndpoints_ReturnsForbidden(string method, string path)
+    {
+        var (_, normalUserClient) = await RegisterAsync(factory, "normal-user@example.test");
+
+        using (normalUserClient)
+        {
+            var request = new HttpRequestMessage(new HttpMethod(method), path);
+            var response = await normalUserClient.SendAsync(request);
+
+            // Een normale gebruiker mist de Admin-role en krijgt 403 Forbidden, niet 401.
+            Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        }
+    }
+
+    // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------
 
