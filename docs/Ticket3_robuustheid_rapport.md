@@ -104,3 +104,41 @@ De testsuite dekt nu:
 Bij afmelding van een afspraak in OpenMRS stuurt het systeem een webhook met status `cancelled`. De module stopt dan met het versturen van herinneringen. Er is echter een klein tijdvenster (een "race condition") waarbij de annulering-webhook binnenkomt terwijl de consumer al bezig is het bericht te versturen. In dat geval krijgt de patiënt toch een SMS.
 
 De kans hierop is laag, maar niet nul. Een "just-in-time" statuscheck bij OpenMRS vlak vóór het versturen zou dit oplossen. Die check is nog niet gebouwd. Het staat op de backlog als verbeterpunt voor een volgende iteratie.
+
+---
+
+## 5. Performance & Load Testing (Bewezen Resultaten)
+
+Om te bewijzen dat de applicatie onder druk blijft functioneren, is er een **NBomber load test** uitgevoerd tegen een live Docker-stack (API, PostgreSQL, RabbitMQ). 
+- **Scenario:** 50 gelijktijdige webhook-verzoeken per seconde, gedurende 60 seconden.
+- **Resultaat:** 3000 succesvolle verzoeken (100% succes, status code 202). Nul fouten, nul verloren berichten in de queue.
+
+**Observaties & Latency:**
+Uit de rapportage van NBomber blijkt dat de p95 latency rond de 2105 ms lag, en de gemiddelde latency 2072 ms was. 
+Dit is opvallend: het oorspronkelijke _ontwerpdoel_ (uit Doc 1) stelde dat de webhook-ingestie onder de 200 ms moest blijven. Hoewel de applicatie perfect **robuust** bleek (geen uitval onder belasting), werd dit latency-doel lokaal in Docker niet behaald. 
+
+Oorzaken hiervoor zijn onder andere database-contention (te veel open connecties naar PostgreSQL tegelijk) of limitaties in hoe de test lokaal HTTP clients opzet. Dit levert het waardevolle inzicht op dat voor daadwerkelijke productie de API op applicatieniveau (bijv. met betere connectie-pooling of HttpClientFactory) geoptimaliseerd moet worden om aan de strikte p95 < 200ms eis te voldoen. 
+
+---
+
+## 6. Verantwoording Tooling
+
+Tijdens de ontwikkeling en optimalisatie van de applicatie zijn diverse tools ingezet om de kwaliteit en robuustheid te meten en te borgen.
+
+| Tool | Waarvoor is het gebruikt? | Wat was de vondst / het resultaat? |
+| :--- | :--- | :--- |
+| **xUnit** | Unit en integratietesten van alle componenten, inclusief security en auth. | Borging van o.a. cookie-isolatie (voorkomen van sessielekken) en HMAC-validatie. |
+| **Docker (Compose)** | Het lokaal opzetten van een productie-achtige omgeving met de API, Postgres en RabbitMQ. | Gaf inzicht in hoe het systeem werkt met echte netwerkisolatie. Essentieel voor de loadtest, omdat de lichte setup (~430MB RAM) soepel draaide. |
+| **NBomber** | Het genereren van hoge belasting (50 RPS) op de webhook-ingestie. | Toonde aan dat de applicatie niet crasht of requests verliest onder druk, maar bracht ook aan het licht dat de latency-doelstelling van < 200ms in de huidige lokale opzet nog niet wordt gehaald (~2.1s p95). |
+| **Prometheus / OpenTelemetry** | Het scrapen en exporteren van metrics (`/metrics`), waaronder verwerkte HTTP-requests en aflevertijden. | Bevestiging dat applicatie de metrics netjes blootlegt en dat live monitoring (inclusief queueing) correct functioneert, zonder de API onnodig zwaar te maken. |
+
+---
+
+## 7. Volgende stappen
+
+Om het platform klaar te maken voor productie, zijn dit de eerstvolgende actiepunten:
+
+1. **Optimaliseren van Webhook Latency:** De NBomber-test liet zien dat p95 latency te hoog is (~2 sec). Er moet onderzocht worden of dit door EF Core/PostgreSQL connection pooling komt, of door netwerk-overhead, zodat we het doel van < 200 ms bereiken.
+2. **"Just-in-time" Statuscheck (Race Condition):** Het inbouwen van een laatste check in OpenMRS net voordat we een SMS sturen, om te voorkomen dat geannuleerde afspraken alsnog een reminder krijgen.
+3. **Alerting Configureren:** Naast Grafana dashboards en Prometheus metrics, willen we Alertmanager configureren zodat beheerders automatisch een seintje krijgen bij een piek in HTTP 500's of vastgelopen consumers.
+4. **Opschonen Rate Limiter (Test-code verwijderen):** Voor de loadtest is de Global Rate Limiter tijdelijk sterk verhoogd. In productie moet er een specifieke `[EnableRateLimiting]` komen voor het webhook-endpoint (die hoge throughput toestaat van vertrouwde IP's), terwijl de rest van de API strak gelimiteerd blijft.
