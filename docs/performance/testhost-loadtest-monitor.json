@@ -1,0 +1,26 @@
+[
+  {
+    "Timestamp": "2026-06-26T17:44:01.554201+00:00",
+    "CpuSeconds": 3.75,
+    "WorkingSetMb": 203.11,
+    "PrivateMemoryMb": 96.4,
+    "ThreadCount": 26,
+    "HandleCount": 1014
+  },
+  {
+    "Timestamp": "2026-06-26T17:44:01.8259236+00:00",
+    "CpuSeconds": 4.594,
+    "WorkingSetMb": 203.84,
+    "PrivateMemoryMb": 97.14,
+    "ThreadCount": 26,
+    "HandleCount": 714
+  },
+  {
+    "Timestamp": "2026-06-26T17:44:02.0873402+00:00",
+    "CpuSeconds": 5.469,
+    "WorkingSetMb": 204.07,
+    "PrivateMemoryMb": 97.32,
+    "ThreadCount": 26,
+    "HandleCount": 714
+  }
+]

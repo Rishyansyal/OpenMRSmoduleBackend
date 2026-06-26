@@ -1,0 +1,28 @@
+{
+  "startedAt": "2026-06-26T20:10:52.5674698+02:00",
+  "finishedAt": "2026-06-26T20:11:22.0645634+02:00",
+  "baseUrl": "http://localhost:5111",
+  "endpoint": "/health",
+  "requests": 10000,
+  "concurrency": 100,
+  "totalDurationSeconds": 24.901,
+  "throughputRequestsPerSecond": 401.59,
+  "successCount": 97,
+  "failureCount": 9903,
+  "successRatePercent": 0.97,
+  "minMs": 0.684,
+  "p50Ms": 1.751,
+  "p95Ms": 17.057,
+  "p99Ms": 155.001,
+  "maxMs": 2349.097,
+  "statusCodes": [
+    {
+      "status": "200",
+      "count": 97
+    },
+    {
+      "status": "429",
+      "count": 9903
+    }
+  ]
+}

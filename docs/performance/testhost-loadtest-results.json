@@ -1,0 +1,30 @@
+{
+  "startedAt": "2026-06-26T17:44:01.5527612+00:00",
+  "finishedAt": "2026-06-26T17:44:02.3656208+00:00",
+  "host": "Microsoft.AspNetCore.Mvc.Testing TestServer",
+  "endpoint": "/health",
+  "requestCount": 10000,
+  "concurrency": 100,
+  "totalDurationSeconds": 0.638,
+  "throughputRequestsPerSecond": 15669.37,
+  "successCount": 10000,
+  "failureCount": 0,
+  "successRatePercent": 100,
+  "statusCodes": {
+    "200": 10000
+  },
+  "latencyMs": {
+    "min": 0.236,
+    "p50": 5.122,
+    "p95": 9.379,
+    "p99": 19.459,
+    "max": 42.448
+  },
+  "monitor": {
+    "sampleIntervalMs": 250,
+    "samples": 3,
+    "maxWorkingSetMb": 204.07,
+    "maxPrivateMemoryMb": 97.32
+  },
+  "errors": []
+}

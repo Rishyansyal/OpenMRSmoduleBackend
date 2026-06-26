@@ -1,0 +1,20 @@
+[
+  {
+    "name": "lu1perf-api-1",
+    "samples": 8,
+    "maxCpuPercent": 69.73,
+    "maxMemMiB": 130.5
+  },
+  {
+    "name": "lu1perf-db-1",
+    "samples": 8,
+    "maxCpuPercent": 5.05,
+    "maxMemMiB": 40.35
+  },
+  {
+    "name": "lu1perf-rabbitmq-1",
+    "samples": 8,
+    "maxCpuPercent": 112.59,
+    "maxMemMiB": 95.2
+  }
+]
